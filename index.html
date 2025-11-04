@@ -41,9 +41,9 @@
   <div id="toast">✅ All changes saved successfully!</div>
 
   <script>
-    // === CONFIGURATION ($2a$10$k9Vdi4hiDaIVlqjBpfLv2.MVNvOYkcFkTwzxfPfl/KKT2mOIBuBxu) ===
+    // === CONFIGURATION ($2a$10$WYyO8b2IWZgwFczllVFuXOKxWm7MVesk9dSXSb0g.0/CMFmB.e1vi) ===
     const JSONBIN_URL = "https://api.jsonbin.io/v3/b/6909f9efae596e708f43d542";
-    const API_KEY = "$2a$10$k9Vdi4hiDaIVlqjBpfLv2.MVNvOYkcFkTwzxfPfl/KKT2mOIBuBxu"; // <- REPLACE with your JSONBin secret key locally
+    const API_KEY = "$2a$10$WYyO8b2IWZgwFczllVFuXOKxWm7MVesk9dSXSb0g.0/CMFmB.e1vi"; // <- REPLACE with your JSONBin secret key locally
     const POLL_INTERVAL_MS = 10000; // 10 seconds
     const PASSWORD = "Iamtoogood009";
     let adminMode = false;
@@ -149,7 +149,7 @@
     }
 
     async function pushBin(obj) {
-      if (!API_KEY || API_KEY === "$2a$10$k9Vdi4hiDaIVlqjBpfLv2.MVNvOYkcFkTwzxfPfl/KKT2mOIBuBxu") {
+      if (!API_KEY || API_KEY === "$2a$10$WYyO8b2IWZgwFczllVFuXOKxWm7MVesk9dSXSb0g.0/CMFmB.e1vi") {
         console.warn("API key not set; not pushing to JSONBin.");
         return false;
       }
@@ -158,7 +158,7 @@
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            "X-Master-Key": API_KEY
+            "X-Master-Key": $2a$10$WYyO8b2IWZgwFczllVFuXOKxWm7MVesk9dSXSb0g.0/CMFmB.e1vi
           },
           body: JSON.stringify(obj)
         });
