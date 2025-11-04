@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Pookie Boss Timer</title>
 
-  <!-- Link to external CSS (web.css) -->
+  <!-- external CSS -->
   <link rel="stylesheet" href="web.css">
 
   <!-- PWA manifest -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#013220">
 
-  <!-- Service worker registration (keeps PWA behavior) -->
+  <!-- Service worker registration -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
@@ -22,7 +22,7 @@
   </script>
 
   <style>
-    /* Small local styles for connection indicator placement (kept minimal to rely on web.css) */
+    /* Small local styles for connection indicator placement */
     #topControls { position: relative; }
     #connection-status {
       position: absolute;
@@ -32,7 +32,6 @@
       display: none; /* shown only in admin mode */
     }
     #connection-status .dot { font-size: 18px; margin-right: 6px; }
-    /* Toast slide-up animation override (it uses .show from web.css) */
     #toast { z-index: 3000; }
   </style>
 </head>
@@ -42,19 +41,18 @@
   <div id="clock-label">Philippine Time (UTC+8)</div>
   <div id="clock">--:--:-- --</div>
 
-  <!-- Top controls: Admin login and connection indicator -->
+  <!-- Top controls -->
   <div id="topControls">
     <button id="admin-login" class="admin-btn">Admin Login</button>
 
-    <!-- Connection Status Indicator (admin-only, persistent) -->
-    <!-- Will show: "🟢 Connected to JSONBin" or "🔴 Disconnected from JSONBin" -->
+    <!-- Persistent Admin-only Connection Indicator -->
     <div id="connection-status" aria-live="polite" role="status">
       <span id="conn-dot" class="dot">🔴</span>
       <span id="conn-text">Disconnected from JSONBin</span>
     </div>
   </div>
 
-  <!-- Admin actions (Add / Save buttons) -->
+  <!-- Admin action buttons -->
   <div id="admin-actions" style="display:none; margin-top: 12px;">
     <button id="add-timer" class="admin-btn">Add New Timer</button>
     <button id="save-timers" class="save-btn">Save Changes</button>
@@ -66,27 +64,25 @@
       <tr>
         <th>BOSS</th>
         <th>COUNTDOWN TIMER</th>
-        <th>RESPAWN TIME</th>
+        <th>RESPAWN TIME (UTC)</th>
         <th>ACTIONS</th>
       </tr>
     </thead>
     <tbody id="timer-body"></tbody>
   </table>
 
-  <!-- Toast for save/connection messages -->
+  <!-- Toast -->
   <div id="toast" role="status" aria-live="polite">✅ All changes saved successfully!</div>
 
-  <!-- === JS: Timers, JSONBin sync, admin, toasts, connection indicator === -->
   <script>
   /**************************************************************************
-   * Pookie Boss Timer - index.html
-   * - JSONBin sync embedded (Bin URL + API Key)
-   * - Connection test runs after admin login and re-tests every 5 minutes
-   * - Auto-save on admin edits/jumps/add
-   * - Persistent admin-only connection indicator and toasts
+   * Pookie Boss Timer - Updated index.html
+   * - Respawn times fixed using `targetTime` (ms since epoch)
+   * - targetTime is synced to JSONBin so everyone sees exact same respawn
+   * - Respawn times displayed in UTC (full date+time with seconds)
+   * - JSONBin sync, admin connection test, auto-save on admin edits/add/jump
    *
-   * NOTE: This file contains an embedded master API key (as requested).
-   *       Keep the file private to avoid exposing the key.
+   * Note: this file contains an embedded JSONBin master key (as requested).
    **************************************************************************/
 
   /* ------------------------
@@ -104,12 +100,44 @@
   let adminMode = false;
   let connectionOK = false;
   let connectionRetestTimer = null;
-  let isApplyingRemote = false; // prevents echoing remote write back to remote
-  let timers = JSON.parse(localStorage.getItem("pookieTimers")) || [
-    { name: "VENATUS", duration: 10 * 3600, remaining: 10 * 3600 },
-    { name: "VIORENT", duration: 10 * 3600, remaining: 10 * 3600 },
-    { name: "EGO", duration: 21 * 3600, remaining: 21 * 3600 }
-  ];
+  let isApplyingRemote = false; // prevents loops when applying remote updates
+
+  // timers array: each timer has { name, duration (seconds), targetTime (ms) }
+  // If loaded from older localStorage format, we'll compute targetTime from remaining.
+  let timers = (function(){
+    const saved = localStorage.getItem("pookieTimers");
+    if (!saved) {
+      // default timers (with targetTime = now + duration)
+      const now = Date.now();
+      return [
+        { name: "VENATUS", duration: 10 * 3600, targetTime: now + 10 * 3600 * 1000 },
+        { name: "VIORENT", duration: 10 * 3600, targetTime: now + 10 * 3600 * 1000 },
+        { name: "EGO", duration: 21 * 3600, targetTime: now + 21 * 3600 * 1000 }
+      ];
+    }
+    try {
+      const parsed = JSON.parse(saved);
+      // Support both old format (duration + remaining) and new (duration + targetTime)
+      if (Array.isArray(parsed) && parsed.length) {
+        return parsed.map(t => {
+          if (t.targetTime) return { name: t.name, duration: t.duration, targetTime: t.targetTime };
+          // fallback: compute targetTime = now + remaining
+          if (t.remaining != null) {
+            return { name: t.name, duration: t.duration, targetTime: Date.now() + (t.remaining * 1000) };
+          }
+          // fallback: set targetTime = now + duration
+          return { name: t.name, duration: t.duration, targetTime: Date.now() + (t.duration * 1000) };
+        });
+      }
+    } catch (e) { console.warn("Failed parsing saved timers", e); }
+    // final fallback defaults
+    const now = Date.now();
+    return [
+      { name: "VENATUS", duration: 10 * 3600, targetTime: now + 10 * 3600 * 1000 },
+      { name: "VIORENT", duration: 10 * 3600, targetTime: now + 10 * 3600 * 1000 },
+      { name: "EGO", duration: 21 * 3600, targetTime: now + 21 * 3600 * 1000 }
+    ];
+  })();
 
   /* ------------------------
      Utilities
@@ -118,6 +146,12 @@
     return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
   }
 
+  // remaining seconds computed from targetTime
+  function getRemainingSec(timer) {
+    return Math.max(0, Math.ceil((timer.targetTime - Date.now()) / 1000));
+  }
+
+  // format remaining as HH:MM:SS
   function formatTime(sec) {
     if (sec < 0) sec = 0;
     const h = String(Math.floor(sec / 3600)).padStart(2, "0");
@@ -126,12 +160,12 @@
     return `${h}:${m}:${s}`;
   }
 
-  // Philippine time full timestamp formatting
-  function formatFullPHDateFromNowPlus(remainingSeconds) {
-    const now = new Date();
-    const respawn = new Date(now.getTime() + remainingSeconds * 1000);
-    return respawn.toLocaleString("en-US", {
-      timeZone: "Asia/Manila",
+  // Format full UTC date/time for respawn column
+  function formatFullUTC(ms) {
+    const d = new Date(ms);
+    // Use toLocaleString with timeZone UTC and include seconds
+    return d.toLocaleString("en-US", {
+      timeZone: "UTC",
       weekday: "long",
       month: "long",
       day: "numeric",
@@ -139,12 +173,12 @@
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",
-      hour12: true
-    });
+      hour12: false
+    }) + " UTC";
   }
 
   /* ------------------------
-     Clock (12-hour PH time) - displayed beneath title
+     Clock (12-hour Philippine time) - displayed beneath title
      ------------------------ */
   function updateClock() {
     const now = new Date().toLocaleTimeString("en-US", { timeZone: "Asia/Manila", hour12: true });
@@ -157,11 +191,8 @@
      Toast helper (teal/red slide-up & fade)
      ------------------------ */
   function showToast(message, type = "success") {
-    // type: "success" => teal, "error" => red
     const toast = document.getElementById("toast");
     toast.textContent = message;
-
-    // apply color styling inline so it doesn't rely on web.css changes
     if (type === "success") {
       toast.style.background = "linear-gradient(90deg, rgba(0,255,170,0.12), rgba(0,255,170,0.06))";
       toast.style.color = "#001f00";
@@ -173,9 +204,7 @@
       toast.style.border = "1px solid rgba(255,20,20,0.25)";
       toast.style.boxShadow = "0 6px 22px rgba(255,0,0,0.12)";
     }
-
     toast.classList.add("show");
-    // auto-hide after 3s
     setTimeout(() => toast.classList.remove("show"), 3000);
   }
 
@@ -186,17 +215,18 @@
     const tbody = document.getElementById("timer-body");
     tbody.innerHTML = "";
     timers.forEach((t, i) => {
-      const respawnTime = formatFullPHDateFromNowPlus(t.remaining);
+      const remaining = getRemainingSec(t);
+      const respawnUTC = formatFullUTC(t.targetTime);
       let color = "#00ff66"; // default vibrant green
-      if (t.remaining <= 60 * 20) color = "red";
-      else if (t.remaining <= 60 * 60) color = "orange";
-      else if (t.remaining <= 3 * 60 * 60) color = "yellow";
+      if (remaining <= 60 * 20) color = "red";
+      else if (remaining <= 60 * 60) color = "orange";
+      else if (remaining <= 3 * 60 * 60) color = "yellow";
 
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td class="timer-name" style="color:${color}">${escapeHtml(t.name)}</td>
-        <td class="countdown" id="timer-${i}">${formatTime(t.remaining)}</td>
-        <td class="respawn" id="respawn-${i}">${respawnTime}</td>
+        <td class="countdown" id="timer-${i}">${formatTime(remaining)}</td>
+        <td class="respawn" id="respawn-${i}">${respawnUTC}</td>
         <td>
           ${adminMode ? `
             <button class="admin-btn" onclick="editTimer(${i})">Edit</button>
@@ -207,44 +237,49 @@
       tbody.appendChild(tr);
     });
 
-    // show/hide admin actions block
+    // show/hide admin actions UI
     document.getElementById("admin-actions").style.display = adminMode ? "block" : "none";
-
-    // show/hide connection indicator for admins
     document.getElementById("connection-status").style.display = adminMode ? "block" : "none";
   }
 
   /* ------------------------
-     Countdown tick (runs locally), loops when reaching zero
+     Countdown tick (recomputes remaining from targetTime each second)
+     - when a timer reaches zero, we advance targetTime by duration (loop)
+     - this ensures targetTime is always a fixed timestamp, and loops create a new fixed timestamp
      ------------------------ */
-  function tick() {
+  function tickAndHandleLoops() {
+    const now = Date.now();
+    let changed = false;
     timers.forEach(t => {
-      t.remaining--;
-      if (t.remaining <= 0) t.remaining = t.duration;
+      if (t.targetTime <= now) {
+        // loop: set next targetTime = previous targetTime + duration (keeps periodic schedule)
+        // Use while to handle long gaps (in case app was closed for long)
+        while (t.targetTime <= now) {
+          t.targetTime += t.duration * 1000;
+        }
+        changed = true;
+      }
     });
+    if (changed) {
+      // Persist locally; if admin and connected we'll push too in other flows
+      localStorage.setItem("pookieTimers", JSON.stringify(timers));
+    }
     renderTimers();
   }
-  setInterval(tick, 1000);
+  setInterval(tickAndHandleLoops, 1000);
 
   /* ------------------------
-     JSONBin integration (fetch & push)
-     - fetchBin(): GET the latest bin record
-     - pushBin(obj): PUT update to the bin (requires API key)
+     JSONBin integration
+     - remote format: { timers: [ {name, duration, targetTime}, ... ], lastUpdated: ms }
      ------------------------ */
-
-  // Fetch the bin using /latest (no auth needed for read depending on privacy; we include key for consistency)
   async function fetchBin() {
     try {
       const res = await fetch(JSONBIN_URL + "/latest", {
         method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Master-Key": API_KEY
-        }
+        headers: { "Content-Type": "application/json", "X-Master-Key": API_KEY }
       });
       if (!res.ok) throw new Error(res.status + " " + res.statusText);
       const json = await res.json();
-      // JSONBin v3 returns record in .record
       return json && json.record ? json.record : json;
     } catch (err) {
       console.warn("fetchBin error:", err);
@@ -252,20 +287,16 @@
     }
   }
 
-  // Push entire object (timers + lastUpdated)
   async function pushBin(obj) {
     try {
       const res = await fetch(JSONBIN_URL, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Master-Key": API_KEY
-        },
+        headers: { "Content-Type": "application/json", "X-Master-Key": API_KEY },
         body: JSON.stringify(obj)
       });
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(res.status + " " + res.statusText + " - " + text);
+        const txt = await res.text();
+        throw new Error(res.status + " " + res.statusText + " - " + txt);
       }
       return true;
     } catch (err) {
@@ -275,18 +306,21 @@
   }
 
   /* ------------------------
-     Apply remote state (basic merge)
-     If remote timers differ from local timers, replace local with remote.
-     isApplyingRemote flag prevents echo-saving back to JSONBin while applying.
+     Apply remote state (replace local timers when remote differs)
+     - remote timers should contain targetTime; if not, convert as necessary
      ------------------------ */
   async function pullAndApplyRemote() {
     const remote = await fetchBin();
-    if (!remote || !remote.timers) return;
-    // Compare by JSON string — simple approach adequate for this use
-    if (JSON.stringify(remote.timers) !== JSON.stringify(timers)) {
+    if (!remote || !Array.isArray(remote.timers)) return;
+    // Map remote entries to local structure and ensure targetTime exists
+    const remoteTimers = remote.timers.map(rt => {
+      if (rt.targetTime) return { name: rt.name, duration: rt.duration, targetTime: rt.targetTime };
+      if (rt.remaining != null) return { name: rt.name, duration: rt.duration, targetTime: Date.now() + rt.remaining * 1000 };
+      return { name: rt.name, duration: rt.duration, targetTime: Date.now() + rt.duration * 1000 };
+    });
+    if (JSON.stringify(remoteTimers) !== JSON.stringify(timers)) {
       isApplyingRemote = true;
-      timers = remote.timers.map(t => Object.assign({}, t));
-      // Persist to localStorage (so reload shows latest)
+      timers = remoteTimers.map(t => Object.assign({}, t));
       localStorage.setItem("pookieTimers", JSON.stringify(timers));
       renderTimers();
       isApplyingRemote = false;
@@ -294,49 +328,48 @@
   }
 
   /* ------------------------
-     Initial load: try to pull remote once on startup
+     Initial remote pull on load (non-blocking)
      ------------------------ */
   (async () => {
     const remote = await fetchBin();
-    if (remote && remote.timers) {
-      timers = remote.timers.map(t => Object.assign({}, t));
+    if (remote && Array.isArray(remote.timers)) {
+      timers = remote.timers.map(rt => {
+        if (rt.targetTime) return { name: rt.name, duration: rt.duration, targetTime: rt.targetTime };
+        if (rt.remaining != null) return { name: rt.name, duration: rt.duration, targetTime: Date.now() + rt.remaining * 1000 };
+        return { name: rt.name, duration: rt.duration, targetTime: Date.now() + rt.duration * 1000 };
+      });
       localStorage.setItem("pookieTimers", JSON.stringify(timers));
     }
     renderTimers();
   })();
 
   /* ------------------------
-     Polling: viewers periodically pull remote to stay in sync
+     Polling for viewers (pull remote periodically)
      ------------------------ */
   setInterval(() => {
     pullAndApplyRemote();
   }, POLL_INTERVAL_MS);
 
   /* ------------------------
-     Admin: connection test (runs after login, and periodically while logged in)
-     - testConnection(): attempts a small read (GET /latest) and optionally a lightweight write test
-     - updates the connection-status indicator and shows toast
+     Admin connection test and indicator
+     - testConnection() runs on admin login and updates indicator
+     - periodic silent re-test while admin logged in
      ------------------------ */
-  async function testConnection(showToasts = true) {
+  async function testConnection(showToastFlag = true) {
     try {
-      // simple GET check
       const res = await fetch(JSONBIN_URL + "/latest", {
         method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Master-Key": API_KEY
-        }
+        headers: { "Content-Type": "application/json", "X-Master-Key": API_KEY }
       });
       if (!res.ok) throw new Error(res.status + " " + res.statusText);
-      // success
       connectionOK = true;
       updateConnectionIndicator(true);
-      if (showToasts) showToast("✅ Connected to JSONBin", "success");
+      if (showToastFlag) showToast("✅ Connected to JSONBin", "success");
       return true;
     } catch (err) {
       connectionOK = false;
       updateConnectionIndicator(false);
-      if (showToasts) showToast("❌ Failed to connect — check API key or bin URL", "error");
+      if (showToastFlag) showToast("❌ Failed to connect — check API key or bin URL", "error");
       console.warn("Connection test failed:", err);
       return false;
     }
@@ -355,7 +388,7 @@
   }
 
   /* ------------------------
-     Admin mode helpers: login, enable, and periodic re-test
+     Admin login flow (runs connection test after login)
      ------------------------ */
   function setAdminMode(on) {
     adminMode = on;
@@ -363,16 +396,13 @@
     document.getElementById("connection-status").style.display = on ? "block" : "none";
     renderTimers();
 
-    // If turning admin ON, run an immediate connection test and start periodic recheck
     if (on) {
-      testConnection(true); // show toast
-      // clear any existing interval first
+      // immediate connection test (shows toast)
+      testConnection(true);
+      // start periodic silent re-tests
       if (connectionRetestTimer) clearInterval(connectionRetestTimer);
-      connectionRetestTimer = setInterval(() => {
-        testConnection(false); // silent re-test (no toast) but indicator updates
-      }, CONNECTION_RETEST_MS);
+      connectionRetestTimer = setInterval(() => testConnection(false), CONNECTION_RETEST_MS);
     } else {
-      // turning admin off: clear periodic recheck
       if (connectionRetestTimer) {
         clearInterval(connectionRetestTimer);
         connectionRetestTimer = null;
@@ -380,113 +410,107 @@
     }
   }
 
-  // Admin login button handler (runs connection test after successful login)
   document.getElementById("admin-login").addEventListener("click", async () => {
     const pass = prompt("Enter Admin Password:");
     if (pass === PASSWORD) {
       setAdminMode(true);
-      // persist admin mode locally to avoid re-login while page open
       localStorage.setItem("pookieAdmin", "true");
       showToast("Admin mode enabled", "success");
-      // run connection test now (shows toast)
-      await testConnection(true);
+      // run connection test and show toast (already done inside setAdminMode)
     } else {
       alert("Incorrect password!");
     }
   });
 
-  // Restore admin state on reload (does not auto-run test until login as required; but setAdminMode true if persisted)
+  // restore admin UI (does not auto-run test unless admin re-logins)
   if (localStorage.getItem("pookieAdmin") === "true") {
-    // If previously admin, enable admin UI but run connection test only on explicit login.
-    // You asked for test to run right after login; this restores UI without auto-testing.
     setAdminMode(true);
   }
 
   /* ------------------------
-     Admin actions: edit, jump, add timers
-     - All admin modifications auto-save to JSONBin (pushBin)
-     - isApplyingRemote prevents feedback loop
+     Admin actions (auto-save to JSONBin)
+     - editTimer(i): change name/duration -> recompute targetTime to now+duration
+     - jumpToTime(i): set targetTime = now + requestedRemaining
+     - add timer: set targetTime = now + duration
+     - Each change auto-pushes to JSONBin (if connected)
      ------------------------ */
+  async function autoPushIfConnected() {
+    if (!connectionOK) return false;
+    if (isApplyingRemote) return false;
+    const payload = { timers: timers, lastUpdated: Date.now() };
+    const ok = await pushBin(payload);
+    return ok;
+  }
 
   async function editTimer(i) {
     const newName = prompt("Enter new name:", timers[i].name);
     if (newName) timers[i].name = newName;
-    const newDuration = prompt("Enter new duration in hours:", timers[i].duration / 3600);
+    const newDuration = prompt("Enter new duration in hours:", (timers[i].duration/3600).toString());
     if (newDuration && !isNaN(newDuration)) {
-      timers[i].duration = Math.round(Number(newDuration) * 3600);
-      timers[i].remaining = timers[i].duration;
+      const hours = Number(newDuration);
+      timers[i].duration = Math.round(hours * 3600);
+      // set a new fixed targetTime = now + duration
+      timers[i].targetTime = Date.now() + timers[i].duration * 1000;
     }
+    localStorage.setItem("pookieTimers", JSON.stringify(timers));
     renderTimers();
-
-    // Auto-save to JSONBin
-    if (!isApplyingRemote && connectionOK) {
-      const payload = { timers: timers, lastUpdated: Date.now() };
-      const ok = await pushBin(payload);
+    if (!isApplyingRemote) {
+      const ok = await autoPushIfConnected();
       if (ok) showToast("Auto-saved changes", "success");
-      else showToast("Auto-save failed (check API key)", "error");
+      else if (connectionOK === false) showToast("Auto-save failed (disconnected)", "error");
     }
   }
 
   async function jumpToTime(i) {
-    const newRemaining = prompt("Jump to remaining time (hh:mm:ss):", formatTime(timers[i].remaining));
+    const newRemaining = prompt("Jump to remaining time (HH:MM:SS):", formatTime(getRemainingSec(timers[i])));
     if (!newRemaining) return;
     const parts = newRemaining.split(":").map(Number);
-    if (parts.length !== 3 || parts.some(p => Number.isNaN(p))) {
-      alert("Invalid format. Use HH:MM:SS");
-      return;
-    }
-    timers[i].remaining = parts[0] * 3600 + parts[1] * 60 + parts[2];
+    if (parts.length !== 3 || parts.some(p => Number.isNaN(p))) return alert("Invalid format. Use HH:MM:SS");
+    const secs = parts[0]*3600 + parts[1]*60 + parts[2];
+    // set fixed targetTime = now + secs
+    timers[i].targetTime = Date.now() + secs * 1000;
+    localStorage.setItem("pookieTimers", JSON.stringify(timers));
     renderTimers();
-
-    // Auto-save
-    if (!isApplyingRemote && connectionOK) {
-      const payload = { timers: timers, lastUpdated: Date.now() };
-      const ok = await pushBin(payload);
+    if (!isApplyingRemote) {
+      const ok = await autoPushIfConnected();
       if (ok) showToast("Auto-saved changes", "success");
-      else showToast("Auto-save failed (check API key)", "error");
+      else if (connectionOK === false) showToast("Auto-save failed (disconnected)", "error");
     }
   }
 
-  // Add new timer (admin)
   document.getElementById("add-timer").addEventListener("click", async () => {
     const name = prompt("Enter Boss Name:");
     if (!name) return;
-    const hoursRaw = prompt("Enter Loop Duration (hours):", "12");
+    const hoursRaw = prompt("Enter Loop Duration (hours):", "10");
     const hours = parseFloat(hoursRaw);
     if (!hours || !Number.isFinite(hours) || hours <= 0) return alert("Invalid hours");
     const loopSecs = Math.round(hours * 3600);
-    timers.push({ name, duration: loopSecs, remaining: loopSecs });
+    const newTimer = { name, duration: loopSecs, targetTime: Date.now() + loopSecs * 1000 };
+    timers.push(newTimer);
+    localStorage.setItem("pookieTimers", JSON.stringify(timers));
     renderTimers();
-
-    // Auto-save new timer
-    if (!isApplyingRemote && connectionOK) {
-      const payload = { timers: timers, lastUpdated: Date.now() };
-      const ok = await pushBin(payload);
+    if (!isApplyingRemote) {
+      const ok = await autoPushIfConnected();
       if (ok) showToast("Auto-saved changes", "success");
-      else showToast("Auto-save failed (check API key)", "error");
+      else if (connectionOK === false) showToast("Auto-save failed (disconnected)", "error");
     }
   });
 
-  // Manual Save button (fallback)
+  // Manual Save fallback
   document.getElementById("save-timers").addEventListener("click", async () => {
-    if (!connectionOK) {
-      showToast("Cannot save: disconnected from JSONBin", "error");
-      return;
-    }
-    const payload = { timers: timers, lastUpdated: Date.now() };
-    const ok = await pushBin(payload);
+    if (!connectionOK) { showToast("Cannot save: disconnected from JSONBin", "error"); return; }
+    const ok = await pushBin({ timers: timers, lastUpdated: Date.now() });
     if (ok) showToast("Saved to JSONBin", "success");
     else showToast("Save failed: check API key", "error");
   });
 
   /* ------------------------
-     Small API helpers exposed for debugging (optional)
+     Optional: expose helpers for debugging
      ------------------------ */
   window._pookie = {
     getTimers: () => timers,
     pushNow: async () => {
-      const ok = await pushBin({ timers: timers, lastUpdated: Date.now() });
-      return ok;
+      return await pushBin({ timers: timers, lastUpdated: Date.now() });
     },
     testConnectionNow: async () => testConnection(true)
   };
