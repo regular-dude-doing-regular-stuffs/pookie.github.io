@@ -10,12 +10,14 @@ body {
 }
 
 /* 🔶 Title */
+/* 🔶 Title */
 h1 {
   font-size: 50px;
   margin-top: 20px;
-  color: orange;
+  color: yellow; /* Title now yellow */
   text-shadow: none;
 }
+
 
 /* 🕒 Clock (keeps red glow) */
 #clock {
@@ -132,3 +134,4 @@ th {
   visibility: visible;
   bottom: 50px;
 }
+
