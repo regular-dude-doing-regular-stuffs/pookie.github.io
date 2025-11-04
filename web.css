@@ -1,19 +1,19 @@
-/* 🌿 Pookie Boss Timer Stylesheet (Dark Green + Orange Theme + Yellow Title) */
+/* 🌿 Pookie Boss Timer Stylesheet (Dark Green + Vibrant Green Text Theme) */
 
 body {
   background-color: #013220;
-  color: orange;
+  color: #00ff66;
   font-family: Arial, sans-serif;
   text-align: center;
   margin: 0;
   padding: 0;
 }
 
-/* 🟡 Title (Yellow) */
+/* 💚 Title (Vibrant Green) */
 h1 {
   font-size: 50px;
   margin-top: 20px;
-  color: yellow;
+  color: #00ff66;
   text-shadow: none;
 }
 
@@ -25,18 +25,18 @@ h1 {
 }
 
 #clock-label {
-  color: orange;
+  color: #00ff66;
   margin-bottom: 20px;
   text-shadow: none;
 }
 
-/* ✨ Orange Pulse Animation (for table borders/buttons) */
-@keyframes orangePulse {
+/* ✨ Green Pulse Animation (for borders/buttons) */
+@keyframes greenPulse {
   0%, 100% {
-    box-shadow: 0 0 10px #ffaa00, 0 0 20px orange;
+    box-shadow: 0 0 10px #00ff66, 0 0 20px #00ff99;
   }
   50% {
-    box-shadow: 0 0 20px #ffcc33, 0 0 40px #ff9900;
+    box-shadow: 0 0 20px #00ffaa, 0 0 40px #00ff66;
   }
 }
 
@@ -45,57 +45,57 @@ table {
   width: 90%;
   margin: 20px auto;
   border-collapse: collapse;
-  box-shadow: 0 0 15px #ffaa00;
+  box-shadow: 0 0 15px #00ff66;
 }
 
 th, td {
-  border: 2px solid #ffaa00;
+  border: 2px solid #00ff66;
   padding: 10px;
   text-align: center;
-  color: orange;
+  color: #00ff66;
 }
 
 th {
   font-size: 24px;
-  background-color: rgba(255, 165, 0, 0.1);
-  animation: orangePulse 4s infinite ease-in-out;
+  background-color: rgba(0, 255, 102, 0.1);
+  animation: greenPulse 4s infinite ease-in-out;
 }
 
 /* 🕹️ Timers */
 .timer-name {
   font-size: 24px;
   font-weight: bold;
-  color: orange;
+  color: #00ff66;
   transition: color 0.5s;
 }
 
 .countdown {
   font-size: 48px;
-  color: orange;
+  color: #00ff66;
 }
 
 .respawn {
   font-size: 20px;
-  color: orange;
+  color: #00ff66;
 }
 
 /* 🧩 Buttons */
 .admin-btn, .save-btn {
   background-color: #0f5132;
-  color: orange;
+  color: #00ff66;
   border: none;
   padding: 10px 20px;
   margin: 5px;
   border-radius: 8px;
   cursor: pointer;
-  box-shadow: 0 0 10px #ffaa00;
+  box-shadow: 0 0 10px #00ff66;
   transition: all 0.3s ease;
-  animation: orangePulse 5s infinite ease-in-out;
+  animation: greenPulse 5s infinite ease-in-out;
 }
 
 .admin-btn:hover, .save-btn:hover {
   background-color: #198754;
-  box-shadow: 0 0 25px #ffaa00, 0 0 45px orange;
+  box-shadow: 0 0 25px #00ff66, 0 0 45px #00ffaa;
 }
 
 /* 🔐 Admin and Toasts */
@@ -111,16 +111,4 @@ th {
 
 /* 🕯️ Toast Notification */
 #toast {
-  visibility: hidden;
-  min-width: 300px;
-  margin-left: -150px;
-  background-color: rgba(255, 140, 0, 0.95);
-  color: orange;
-  text-align: center;
-  border-radius: 8px;
-  padding: 16px;
-  position: fixed;
-  left: 50%;
-  bottom: -100px;
-  font-size: 17px;
-  box-
+  visibility: hi
