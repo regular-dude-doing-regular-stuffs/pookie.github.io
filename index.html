@@ -1,32 +1,67 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Pookie Boss Timer</title>
-  <link rel="stylesheet" href="web.css" />
-  <link rel="manifest" href="manifest.json" />
+
+  <!-- Link to external CSS (web.css) -->
+  <link rel="stylesheet" href="web.css">
+
+  <!-- PWA manifest -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#013220">
+
+  <!-- Service worker registration (keeps PWA behavior) -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('service-worker.js');
+        navigator.serviceWorker.register('service-worker.js').catch(e => console.warn('SW registration failed', e));
       });
     }
   </script>
+
+  <style>
+    /* Small local styles for connection indicator placement (kept minimal to rely on web.css) */
+    #topControls { position: relative; }
+    #connection-status {
+      position: absolute;
+      right: 10px;
+      top: 48px; /* below admin button */
+      font-weight: 700;
+      display: none; /* shown only in admin mode */
+    }
+    #connection-status .dot { font-size: 18px; margin-right: 6px; }
+    /* Toast slide-up animation override (it uses .show from web.css) */
+    #toast { z-index: 3000; }
+  </style>
 </head>
 <body>
+  <!-- Title and clock -->
   <h1>Boss Respawn Schedule</h1>
   <div id="clock-label">Philippine Time (UTC+8)</div>
-  <div id="clock"></div>
+  <div id="clock">--:--:-- --</div>
 
-  <button id="admin-login" class="admin-btn">Admin Login</button>
+  <!-- Top controls: Admin login and connection indicator -->
+  <div id="topControls">
+    <button id="admin-login" class="admin-btn">Admin Login</button>
 
-  <div id="admin-actions" style="display:none;">
+    <!-- Connection Status Indicator (admin-only, persistent) -->
+    <!-- Will show: "🟢 Connected to JSONBin" or "🔴 Disconnected from JSONBin" -->
+    <div id="connection-status" aria-live="polite" role="status">
+      <span id="conn-dot" class="dot">🔴</span>
+      <span id="conn-text">Disconnected from JSONBin</span>
+    </div>
+  </div>
+
+  <!-- Admin actions (Add / Save buttons) -->
+  <div id="admin-actions" style="display:none; margin-top: 12px;">
     <button id="add-timer" class="admin-btn">Add New Timer</button>
     <button id="save-timers" class="save-btn">Save Changes</button>
   </div>
 
-  <table id="timer-table">
+  <!-- Timers table -->
+  <table id="timer-table" aria-label="Boss timers" style="margin-top:18px;">
     <thead>
       <tr>
         <th>BOSS</th>
@@ -38,251 +73,424 @@
     <tbody id="timer-body"></tbody>
   </table>
 
-  <div id="toast">✅ All changes saved successfully!</div>
+  <!-- Toast for save/connection messages -->
+  <div id="toast" role="status" aria-live="polite">✅ All changes saved successfully!</div>
 
+  <!-- === JS: Timers, JSONBin sync, admin, toasts, connection indicator === -->
   <script>
-    // === CONFIGURATION ("$2a$10$WYyO8b2IWZgwFczllVFuXOKxWm7MVesk9dSXSb0g.0/CMFmB.e1vi") ===
-    const JSONBIN_URL = "https://api.jsonbin.io/v3/b/6909f9efae596e708f43d542";
-    const API_KEY = "$2a$10$WYyO8b2IWZgwFczllVFuXOKxWm7MVesk9dSXSb0g.0/CMFmB.e1vi"; // <- REPLACE with your JSONBin secret key locally
-    const POLL_INTERVAL_MS = 10000; // 10 seconds
-    const PASSWORD = "Iamtoogood009";
-    let adminMode = false;
-    let isApplyingRemote = false; // flag to avoid loops
+  /**************************************************************************
+   * Pookie Boss Timer - index.html
+   * - JSONBin sync embedded (Bin URL + API Key)
+   * - Connection test runs after admin login and re-tests every 5 minutes
+   * - Auto-save on admin edits/jumps/add
+   * - Persistent admin-only connection indicator and toasts
+   *
+   * NOTE: This file contains an embedded master API key (as requested).
+   *       Keep the file private to avoid exposing the key.
+   **************************************************************************/
 
-    // Local timers cache (will be loaded from JSONBin on start)
-    let timers = [
-      { name: "VENATUS", duration: 10 * 60 * 60, remaining: 10 * 60 * 60 },
-      { name: "VIORENT", duration: 10 * 60 * 60, remaining: 10 * 60 * 60 },
-      { name: "EGO", duration: 21 * 60 * 60, remaining: 21 * 60 * 60 }
-    ];
+  /* ------------------------
+     Configuration (embedded)
+     ------------------------ */
+  const JSONBIN_URL = "https://api.jsonbin.io/v3/b/6909f9efae596e708f43d542";
+  const API_KEY = "$2a$10$WYyO8b2IWZgwFczllVFuXOKxWm7MVesk9dSXSb0g.0/CMFmB.e1vi"; // <-- embedded master key
+  const POLL_INTERVAL_MS = 10000; // 10s auto-refresh for viewers
+  const CONNECTION_RETEST_MS = 5 * 60 * 1000; // 5 minutes re-check while admin logged in
+  const PASSWORD = "Iamtoogood009";
 
-    // --- Utilities ---
-    function formatTime(sec) {
-      const h = String(Math.floor(sec / 3600)).padStart(2, "0");
-      const m = String(Math.floor((sec % 3600) / 60)).padStart(2, "0");
-      const s = String(sec % 60).padStart(2, "0");
-      return `${h}:${m}:${s}`;
+  /* ------------------------
+     State
+     ------------------------ */
+  let adminMode = false;
+  let connectionOK = false;
+  let connectionRetestTimer = null;
+  let isApplyingRemote = false; // prevents echoing remote write back to remote
+  let timers = JSON.parse(localStorage.getItem("pookieTimers")) || [
+    { name: "VENATUS", duration: 10 * 3600, remaining: 10 * 3600 },
+    { name: "VIORENT", duration: 10 * 3600, remaining: 10 * 3600 },
+    { name: "EGO", duration: 21 * 3600, remaining: 21 * 3600 }
+  ];
+
+  /* ------------------------
+     Utilities
+     ------------------------ */
+  function escapeHtml(s){
+    return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+  }
+
+  function formatTime(sec) {
+    if (sec < 0) sec = 0;
+    const h = String(Math.floor(sec / 3600)).padStart(2, "0");
+    const m = String(Math.floor((sec % 3600) / 60)).padStart(2, "0");
+    const s = String(sec % 60).padStart(2, "0");
+    return `${h}:${m}:${s}`;
+  }
+
+  // Philippine time full timestamp formatting
+  function formatFullPHDateFromNowPlus(remainingSeconds) {
+    const now = new Date();
+    const respawn = new Date(now.getTime() + remainingSeconds * 1000);
+    return respawn.toLocaleString("en-US", {
+      timeZone: "Asia/Manila",
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true
+    });
+  }
+
+  /* ------------------------
+     Clock (12-hour PH time) - displayed beneath title
+     ------------------------ */
+  function updateClock() {
+    const now = new Date().toLocaleTimeString("en-US", { timeZone: "Asia/Manila", hour12: true });
+    document.getElementById("clock").textContent = now;
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  /* ------------------------
+     Toast helper (teal/red slide-up & fade)
+     ------------------------ */
+  function showToast(message, type = "success") {
+    // type: "success" => teal, "error" => red
+    const toast = document.getElementById("toast");
+    toast.textContent = message;
+
+    // apply color styling inline so it doesn't rely on web.css changes
+    if (type === "success") {
+      toast.style.background = "linear-gradient(90deg, rgba(0,255,170,0.12), rgba(0,255,170,0.06))";
+      toast.style.color = "#001f00";
+      toast.style.border = "1px solid rgba(0,255,170,0.25)";
+      toast.style.boxShadow = "0 6px 22px rgba(0,255,0,0.15)";
+    } else {
+      toast.style.background = "linear-gradient(90deg, rgba(255,20,20,0.14), rgba(255,50,50,0.06))";
+      toast.style.color = "#2a0000";
+      toast.style.border = "1px solid rgba(255,20,20,0.25)";
+      toast.style.boxShadow = "0 6px 22px rgba(255,0,0,0.12)";
     }
 
-    function updateClock() {
-      const now = new Date().toLocaleTimeString("en-US", { timeZone: "Asia/Manila", hour12: true });
-      document.getElementById("clock").textContent = now;
-    }
-    setInterval(updateClock, 1000);
-    updateClock();
+    toast.classList.add("show");
+    // auto-hide after 3s
+    setTimeout(() => toast.classList.remove("show"), 3000);
+  }
 
-    function showToast(msg = "✅ All changes saved successfully!") {
-      const toast = document.getElementById("toast");
-      toast.textContent = msg;
-      toast.classList.add("show");
-      setTimeout(() => toast.classList.remove("show"), 3000);
-    }
+  /* ------------------------
+     Render timers table
+     ------------------------ */
+  function renderTimers() {
+    const tbody = document.getElementById("timer-body");
+    tbody.innerHTML = "";
+    timers.forEach((t, i) => {
+      const respawnTime = formatFullPHDateFromNowPlus(t.remaining);
+      let color = "#00ff66"; // default vibrant green
+      if (t.remaining <= 60 * 20) color = "red";
+      else if (t.remaining <= 60 * 60) color = "orange";
+      else if (t.remaining <= 3 * 60 * 60) color = "yellow";
 
-    function calculateRespawn(remaining) {
-      const now = new Date();
-      const respawn = new Date(now.getTime() + remaining * 1000);
-      return respawn.toLocaleString("en-US", {
-        timeZone: "Asia/Manila",
-        weekday: "long",
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: true
-      });
-    }
-
-    // --- Rendering ---
-    function renderTimers() {
-      const tbody = document.getElementById("timer-body");
-      tbody.innerHTML = "";
-      timers.forEach((t, i) => {
-        const respawnTime = calculateRespawn(t.remaining);
-        let color = "#00ff66";
-        if (t.remaining <= 60 * 20) color = "red";
-        else if (t.remaining <= 60 * 60) color = "orange";
-        else if (t.remaining <= 3 * 60 * 60) color = "yellow";
-
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td class="timer-name" style="color:${color}">${escapeHtml(t.name)}</td>
-          <td class="countdown" id="timer-${i}">${formatTime(t.remaining)}</td>
-          <td class="respawn" id="respawn-${i}">${respawnTime}</td>
-          <td>
-            ${adminMode ? `
-              <button class="admin-btn" onclick="editTimer(${i})">Edit</button>
-              <button class="admin-btn" onclick="jumpToTime(${i})">Jump To Time</button>
-            ` : ""}
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    function escapeHtml(s){
-      return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
-    }
-
-    // --- Countdown ticking ---
-    function tick() {
-      timers.forEach(t => {
-        t.remaining--;
-        if (t.remaining <= 0) t.remaining = t.duration;
-      });
-      renderTimers();
-    }
-    setInterval(tick, 1000);
-
-    // --- Remote sync with JSONBin ---
-    async function fetchBin() {
-      try {
-        const res = await fetch(JSONBIN_URL + "/latest");
-        if (!res.ok) return null;
-        const data = await res.json();
-        return data && data.record ? data.record : data;
-      } catch (e) {
-        console.warn("Fetch bin failed:", e);
-        return null;
-      }
-    }
-
-    async function pushBin(obj) {
-      if (!API_KEY || API_KEY === "$2a$10$WYyO8b2IWZgwFczllVFuXOKxWm7MVesk9dSXSb0g.0/CMFmB.e1vi") {
-        console.warn("API key not set; not pushing to JSONBin.");
-        return false;
-      }
-      try {
-        const res = await fetch(JSONBIN_URL, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Master-Key": API_KEY
-          },
-          body: JSON.stringify(obj)
-        });
-        return res.ok;
-      } catch (e) {
-        console.warn("Push to bin failed:", e);
-        return false;
-      }
-    }
-
-    async function pullAndApply() {
-      const remote = await fetchBin();
-      if (!remote) return;
-      // basic merge: if remote.lastUpdated > local lastUpdated apply remote
-      // We will consider remote as source of truth unless local had very recent admin edits
-      if (JSON.stringify(remote.timers) !== JSON.stringify(timers)) {
-        isApplyingRemote = true;
-        timers = remote.timers.map(t=>Object.assign({}, t));
-        renderTimers();
-        isApplyingRemote = false;
-      }
-    }
-
-    // initial load
-    (async ()=>{
-      const remote = await fetchBin();
-      if (remote && remote.timers) {
-        timers = remote.timers.map(t=>Object.assign({}, t));
-      }
-      renderTimers();
-    })();
-
-    // Polling
-    setInterval(async ()=>{
-      await pullAndApply();
-    }, POLL_INTERVAL_MS);
-
-    // --- Admin actions (auto-save on change) ---
-    function setAdminMode(on) {
-      adminMode = on;
-      document.getElementById("admin-actions").style.display = on ? "block" : "none";
-      renderTimers();
-    }
-
-    document.getElementById("admin-login").onclick = async () => {
-      const pass = prompt("Enter Admin Password:");
-      if (pass === PASSWORD) {
-        setAdminMode(true);
-        localStorage.setItem("pookieAdmin","true");
-        showToast("Admin mode enabled");
-      } else {
-        alert("Incorrect password!");
-      }
-    };
-
-    // Restore persisted admin flag
-    if (localStorage.getItem("pookieAdmin")==="true") setAdminMode(true);
-
-    // edit timer -> auto-save
-    async function editTimer(i) {
-      const newName = prompt("Enter new name:", timers[i].name);
-      if (newName) timers[i].name = newName;
-      const newDuration = prompt("Enter new duration in hours:", timers[i].duration / 3600);
-      if (newDuration && !isNaN(newDuration)) {
-        timers[i].duration = Math.round(newDuration * 3600);
-        timers[i].remaining = timers[i].duration;
-      }
-      renderTimers();
-      if (!isApplyingRemote) {
-        const payload = { timers: timers, lastUpdated: Date.now() };
-        const ok = await pushBin(payload);
-        if (ok) showToast("Auto-saved changes");
-      }
-    }
-
-    async function jumpToTime(i) {
-      const newRemaining = prompt("Jump to remaining time (hh:mm:ss):", formatTime(timers[i].remaining));
-      if (newRemaining) {
-        const [h, m, s] = newRemaining.split(":").map(Number);
-        timers[i].remaining = h * 3600 + m * 60 + s;
-      }
-      renderTimers();
-      if (!isApplyingRemote) {
-        const payload = { timers: timers, lastUpdated: Date.now() };
-        const ok = await pushBin(payload);
-        if (ok) showToast("Auto-saved changes");
-      }
-    }
-
-    // add new timer (admin)
-    document.getElementById("add-timer").onclick = async () => {
-      const name = prompt("Enter Boss Name:");
-      const hoursRaw = prompt("Enter Loop Duration (hours):");
-      const hours = parseFloat(hoursRaw);
-      if (!name || !Number.isFinite(hours) || hours <= 0) return alert("Invalid input.");
-      const loopSecs = Math.round(hours * 3600);
-      timers.push({ name, duration: loopSecs, remaining: loopSecs });
-      renderTimers();
-      if (!isApplyingRemote) {
-        const payload = { timers: timers, lastUpdated: Date.now() };
-        const ok = await pushBin(payload);
-        if (ok) showToast("Auto-saved changes");
-      }
-    };
-
-    // save button (also available) - still here as fallback
-    document.getElementById("save-timers").onclick = async ()=>{
-      const payload = { timers: timers, lastUpdated: Date.now() };
-      const ok = await pushBin(payload);
-      if (ok) showToast("Saved to JSONBin");
-      else alert("Save failed (check API key).");
-    };
-
-    // auto-persist admin flag on unload
-    window.addEventListener('beforeunload', ()=>{
-      if (adminMode) localStorage.setItem("pookieAdmin","true");
-      else localStorage.removeItem("pookieAdmin");
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td class="timer-name" style="color:${color}">${escapeHtml(t.name)}</td>
+        <td class="countdown" id="timer-${i}">${formatTime(t.remaining)}</td>
+        <td class="respawn" id="respawn-${i}">${respawnTime}</td>
+        <td>
+          ${adminMode ? `
+            <button class="admin-btn" onclick="editTimer(${i})">Edit</button>
+            <button class="admin-btn" onclick="jumpToTime(${i})">Jump To Time</button>
+          ` : ""}
+        </td>
+      `;
+      tbody.appendChild(tr);
     });
 
-    // expose helpers for debugging (optional)
-    window._pookie = {
-      getTimers: ()=>timers,
-      pushNow: async ()=> await pushBin({ timers: timers, lastUpdated: Date.now() })
-    };
+    // show/hide admin actions block
+    document.getElementById("admin-actions").style.display = adminMode ? "block" : "none";
+
+    // show/hide connection indicator for admins
+    document.getElementById("connection-status").style.display = adminMode ? "block" : "none";
+  }
+
+  /* ------------------------
+     Countdown tick (runs locally), loops when reaching zero
+     ------------------------ */
+  function tick() {
+    timers.forEach(t => {
+      t.remaining--;
+      if (t.remaining <= 0) t.remaining = t.duration;
+    });
+    renderTimers();
+  }
+  setInterval(tick, 1000);
+
+  /* ------------------------
+     JSONBin integration (fetch & push)
+     - fetchBin(): GET the latest bin record
+     - pushBin(obj): PUT update to the bin (requires API key)
+     ------------------------ */
+
+  // Fetch the bin using /latest (no auth needed for read depending on privacy; we include key for consistency)
+  async function fetchBin() {
+    try {
+      const res = await fetch(JSONBIN_URL + "/latest", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Master-Key": API_KEY
+        }
+      });
+      if (!res.ok) throw new Error(res.status + " " + res.statusText);
+      const json = await res.json();
+      // JSONBin v3 returns record in .record
+      return json && json.record ? json.record : json;
+    } catch (err) {
+      console.warn("fetchBin error:", err);
+      return null;
+    }
+  }
+
+  // Push entire object (timers + lastUpdated)
+  async function pushBin(obj) {
+    try {
+      const res = await fetch(JSONBIN_URL, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Master-Key": API_KEY
+        },
+        body: JSON.stringify(obj)
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(res.status + " " + res.statusText + " - " + text);
+      }
+      return true;
+    } catch (err) {
+      console.warn("pushBin error:", err);
+      return false;
+    }
+  }
+
+  /* ------------------------
+     Apply remote state (basic merge)
+     If remote timers differ from local timers, replace local with remote.
+     isApplyingRemote flag prevents echo-saving back to JSONBin while applying.
+     ------------------------ */
+  async function pullAndApplyRemote() {
+    const remote = await fetchBin();
+    if (!remote || !remote.timers) return;
+    // Compare by JSON string — simple approach adequate for this use
+    if (JSON.stringify(remote.timers) !== JSON.stringify(timers)) {
+      isApplyingRemote = true;
+      timers = remote.timers.map(t => Object.assign({}, t));
+      // Persist to localStorage (so reload shows latest)
+      localStorage.setItem("pookieTimers", JSON.stringify(timers));
+      renderTimers();
+      isApplyingRemote = false;
+    }
+  }
+
+  /* ------------------------
+     Initial load: try to pull remote once on startup
+     ------------------------ */
+  (async () => {
+    const remote = await fetchBin();
+    if (remote && remote.timers) {
+      timers = remote.timers.map(t => Object.assign({}, t));
+      localStorage.setItem("pookieTimers", JSON.stringify(timers));
+    }
+    renderTimers();
+  })();
+
+  /* ------------------------
+     Polling: viewers periodically pull remote to stay in sync
+     ------------------------ */
+  setInterval(() => {
+    pullAndApplyRemote();
+  }, POLL_INTERVAL_MS);
+
+  /* ------------------------
+     Admin: connection test (runs after login, and periodically while logged in)
+     - testConnection(): attempts a small read (GET /latest) and optionally a lightweight write test
+     - updates the connection-status indicator and shows toast
+     ------------------------ */
+  async function testConnection(showToasts = true) {
+    try {
+      // simple GET check
+      const res = await fetch(JSONBIN_URL + "/latest", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Master-Key": API_KEY
+        }
+      });
+      if (!res.ok) throw new Error(res.status + " " + res.statusText);
+      // success
+      connectionOK = true;
+      updateConnectionIndicator(true);
+      if (showToasts) showToast("✅ Connected to JSONBin", "success");
+      return true;
+    } catch (err) {
+      connectionOK = false;
+      updateConnectionIndicator(false);
+      if (showToasts) showToast("❌ Failed to connect — check API key or bin URL", "error");
+      console.warn("Connection test failed:", err);
+      return false;
+    }
+  }
+
+  function updateConnectionIndicator(ok) {
+    const dot = document.getElementById("conn-dot");
+    const txt = document.getElementById("conn-text");
+    if (ok) {
+      dot.textContent = "🟢";
+      txt.textContent = "Connected to JSONBin";
+    } else {
+      dot.textContent = "🔴";
+      txt.textContent = "Disconnected from JSONBin";
+    }
+  }
+
+  /* ------------------------
+     Admin mode helpers: login, enable, and periodic re-test
+     ------------------------ */
+  function setAdminMode(on) {
+    adminMode = on;
+    document.getElementById("admin-actions").style.display = on ? "block" : "none";
+    document.getElementById("connection-status").style.display = on ? "block" : "none";
+    renderTimers();
+
+    // If turning admin ON, run an immediate connection test and start periodic recheck
+    if (on) {
+      testConnection(true); // show toast
+      // clear any existing interval first
+      if (connectionRetestTimer) clearInterval(connectionRetestTimer);
+      connectionRetestTimer = setInterval(() => {
+        testConnection(false); // silent re-test (no toast) but indicator updates
+      }, CONNECTION_RETEST_MS);
+    } else {
+      // turning admin off: clear periodic recheck
+      if (connectionRetestTimer) {
+        clearInterval(connectionRetestTimer);
+        connectionRetestTimer = null;
+      }
+    }
+  }
+
+  // Admin login button handler (runs connection test after successful login)
+  document.getElementById("admin-login").addEventListener("click", async () => {
+    const pass = prompt("Enter Admin Password:");
+    if (pass === PASSWORD) {
+      setAdminMode(true);
+      // persist admin mode locally to avoid re-login while page open
+      localStorage.setItem("pookieAdmin", "true");
+      showToast("Admin mode enabled", "success");
+      // run connection test now (shows toast)
+      await testConnection(true);
+    } else {
+      alert("Incorrect password!");
+    }
+  });
+
+  // Restore admin state on reload (does not auto-run test until login as required; but setAdminMode true if persisted)
+  if (localStorage.getItem("pookieAdmin") === "true") {
+    // If previously admin, enable admin UI but run connection test only on explicit login.
+    // You asked for test to run right after login; this restores UI without auto-testing.
+    setAdminMode(true);
+  }
+
+  /* ------------------------
+     Admin actions: edit, jump, add timers
+     - All admin modifications auto-save to JSONBin (pushBin)
+     - isApplyingRemote prevents feedback loop
+     ------------------------ */
+
+  async function editTimer(i) {
+    const newName = prompt("Enter new name:", timers[i].name);
+    if (newName) timers[i].name = newName;
+    const newDuration = prompt("Enter new duration in hours:", timers[i].duration / 3600);
+    if (newDuration && !isNaN(newDuration)) {
+      timers[i].duration = Math.round(Number(newDuration) * 3600);
+      timers[i].remaining = timers[i].duration;
+    }
+    renderTimers();
+
+    // Auto-save to JSONBin
+    if (!isApplyingRemote && connectionOK) {
+      const payload = { timers: timers, lastUpdated: Date.now() };
+      const ok = await pushBin(payload);
+      if (ok) showToast("Auto-saved changes", "success");
+      else showToast("Auto-save failed (check API key)", "error");
+    }
+  }
+
+  async function jumpToTime(i) {
+    const newRemaining = prompt("Jump to remaining time (hh:mm:ss):", formatTime(timers[i].remaining));
+    if (!newRemaining) return;
+    const parts = newRemaining.split(":").map(Number);
+    if (parts.length !== 3 || parts.some(p => Number.isNaN(p))) {
+      alert("Invalid format. Use HH:MM:SS");
+      return;
+    }
+    timers[i].remaining = parts[0] * 3600 + parts[1] * 60 + parts[2];
+    renderTimers();
+
+    // Auto-save
+    if (!isApplyingRemote && connectionOK) {
+      const payload = { timers: timers, lastUpdated: Date.now() };
+      const ok = await pushBin(payload);
+      if (ok) showToast("Auto-saved changes", "success");
+      else showToast("Auto-save failed (check API key)", "error");
+    }
+  }
+
+  // Add new timer (admin)
+  document.getElementById("add-timer").addEventListener("click", async () => {
+    const name = prompt("Enter Boss Name:");
+    if (!name) return;
+    const hoursRaw = prompt("Enter Loop Duration (hours):", "12");
+    const hours = parseFloat(hoursRaw);
+    if (!hours || !Number.isFinite(hours) || hours <= 0) return alert("Invalid hours");
+    const loopSecs = Math.round(hours * 3600);
+    timers.push({ name, duration: loopSecs, remaining: loopSecs });
+    renderTimers();
+
+    // Auto-save new timer
+    if (!isApplyingRemote && connectionOK) {
+      const payload = { timers: timers, lastUpdated: Date.now() };
+      const ok = await pushBin(payload);
+      if (ok) showToast("Auto-saved changes", "success");
+      else showToast("Auto-save failed (check API key)", "error");
+    }
+  });
+
+  // Manual Save button (fallback)
+  document.getElementById("save-timers").addEventListener("click", async () => {
+    if (!connectionOK) {
+      showToast("Cannot save: disconnected from JSONBin", "error");
+      return;
+    }
+    const payload = { timers: timers, lastUpdated: Date.now() };
+    const ok = await pushBin(payload);
+    if (ok) showToast("Saved to JSONBin", "success");
+    else showToast("Save failed: check API key", "error");
+  });
+
+  /* ------------------------
+     Small API helpers exposed for debugging (optional)
+     ------------------------ */
+  window._pookie = {
+    getTimers: () => timers,
+    pushNow: async () => {
+      const ok = await pushBin({ timers: timers, lastUpdated: Date.now() });
+      return ok;
+    },
+    testConnectionNow: async () => testConnection(true)
+  };
+
   </script>
 </body>
 </html>
