@@ -61,4 +61,74 @@ th {
   animation: orangePulse 4s infinite ease-in-out;
 }
 
-/* 🕹️ Timers*
+/* 🕹️ Timers */
+.timer-name {
+  font-size: 24px;
+  font-weight: bold;
+  color: orange;
+  transition: color 0.5s;
+}
+
+.countdown {
+  font-size: 48px;
+  color: orange;
+}
+
+.respawn {
+  font-size: 20px;
+  color: orange;
+}
+
+/* 🧩 Buttons */
+.admin-btn, .save-btn {
+  background-color: #0f5132;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  margin: 5px;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 0 10px #ffaa00;
+  transition: all 0.3s ease;
+  animation: orangePulse 5s infinite ease-in-out;
+}
+
+.admin-btn:hover, .save-btn:hover {
+  background-color: #198754;
+  box-shadow: 0 0 25px #ffaa00, 0 0 45px orange;
+}
+
+/* 🔐 Admin and Toasts */
+#admin-login {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+#admin-actions {
+  margin-bottom: 20px;
+}
+
+/* 🕯️ Toast Notification */
+#toast {
+  visibility: hidden;
+  min-width: 300px;
+  margin-left: -150px;
+  background-color: rgba(255, 140, 0, 0.95);
+  color: white;
+  text-align: center;
+  border-radius: 8px;
+  padding: 16px;
+  position: fixed;
+  left: 50%;
+  bottom: -100px;
+  font-size: 17px;
+  box-shadow: 0 0 20px #ffaa00, 0 0 40px orange;
+  transition: all 0.6s ease;
+  z-index: 100;
+}
+
+#toast.show {
+  visibility: visible;
+  bottom: 50px;
+}
