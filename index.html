@@ -42,7 +42,6 @@
 
   <script>
     const PASSWORD = "Iamtoogood009";
-    const BASE_DATE = new Date("2025-11-04T00:00:00+08:00");
     let adminMode = false;
 
     const timers = JSON.parse(localStorage.getItem("pookieTimers")) || [
@@ -58,24 +57,25 @@
       return `${h}:${m}:${s}`;
     }
 
+    // 🕒 Update live Philippine clock
     function updateClock() {
       const now = new Date().toLocaleTimeString("en-US", { timeZone: "Asia/Manila", hour12: true });
       document.getElementById("clock").textContent = now;
     }
-
     setInterval(updateClock, 1000);
     updateClock();
 
+    // 💬 Toast
     function showToast() {
       const toast = document.getElementById("toast");
       toast.classList.add("show");
       setTimeout(() => toast.classList.remove("show"), 3000);
     }
 
-    function calculateRespawn(base, duration, remaining) {
+    // 🕓 Fixed Respawn Time — uses current date + remaining
+    function calculateRespawn(remaining) {
       const now = new Date();
-      const elapsed = duration - remaining;
-      const respawn = new Date(base.getTime() + (elapsed * 1000));
+      const respawn = new Date(now.getTime() + remaining * 1000);
       return respawn.toLocaleString("en-US", { 
         timeZone: "Asia/Manila", 
         weekday: "long", 
@@ -84,6 +84,7 @@
         year: "numeric",
         hour: "2-digit",
         minute: "2-digit",
+        second: "2-digit",
         hour12: true 
       });
     }
@@ -92,83 +93,12 @@
       const tbody = document.getElementById("timer-body");
       tbody.innerHTML = "";
       timers.forEach((t, i) => {
-        const tr = document.createElement("tr");
-        const respawnTime = calculateRespawn(BASE_DATE, t.duration, t.remaining);
-        let color = "#00ff66"; // default green
+        const respawnTime = calculateRespawn(t.remaining);
+        let color = "#00ff66"; // default vibrant green
         if (t.remaining <= 60 * 20) color = "red";
         else if (t.remaining <= 60 * 60) color = "orange";
         else if (t.remaining <= 3 * 60 * 60) color = "yellow";
 
+        const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td class="timer-name" style="color:${color}">${t.name}</td>
-          <td class="countdown" id="timer-${i}">${formatTime(t.remaining)}</td>
-          <td class="respawn" id="respawn-${i}">${respawnTime}</td>
-          <td>
-            ${adminMode ? `
-              <button class="admin-btn" onclick="editTimer(${i})">Edit</button>
-              <button class="admin-btn" onclick="jumpToTime(${i})">Jump To Time</button>
-            ` : ""}
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    function tick() {
-      timers.forEach(t => {
-        t.remaining--;
-        if (t.remaining <= 0) t.remaining = t.duration;
-      });
-      renderTimers();
-    }
-
-    setInterval(tick, 1000);
-    renderTimers();
-
-    function editTimer(i) {
-      const newName = prompt("Enter new name:", timers[i].name);
-      if (newName) timers[i].name = newName;
-      const newDuration = prompt("Enter new duration in hours:", timers[i].duration / 3600);
-      if (newDuration && !isNaN(newDuration)) {
-        timers[i].duration = newDuration * 3600;
-        timers[i].remaining = timers[i].duration;
-      }
-      renderTimers();
-    }
-
-    function jumpToTime(i) {
-      const newRemaining = prompt("Jump to remaining time (hh:mm:ss):", formatTime(timers[i].remaining));
-      if (newRemaining) {
-        const [h, m, s] = newRemaining.split(":").map(Number);
-        timers[i].remaining = h * 3600 + m * 60 + s;
-      }
-      renderTimers();
-    }
-
-    document.getElementById("admin-login").onclick = () => {
-      const pass = prompt("Enter Admin Password:");
-      if (pass === PASSWORD) {
-        adminMode = true;
-        document.getElementById("admin-actions").style.display = "block";
-        renderTimers();
-      } else {
-        alert("Incorrect password!");
-      }
-    };
-
-    document.getElementById("add-timer").onclick = () => {
-      const name = prompt("Enter Boss Name:");
-      const duration = prompt("Enter Respawn Duration (hours):");
-      if (name && duration) {
-        timers.push({ name, duration: duration * 3600, remaining: duration * 3600 });
-        renderTimers();
-      }
-    };
-
-    document.getElementById("save-timers").onclick = () => {
-      localStorage.setItem("pookieTimers", JSON.stringify(timers));
-      showToast();
-    };
-  </script>
-</body>
-</html>
+          <td class="timer-name" style="color:${color}">${t.name}</t
