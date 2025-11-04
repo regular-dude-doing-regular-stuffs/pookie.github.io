@@ -1,4 +1,4 @@
-/* 🌿 Pookie Boss Timer Stylesheet (Dark Green + Orange Text, White Accents, No Letter Glow) */
+/* 🌿 Pookie Boss Timer Stylesheet (Dark Green + Full Orange Text Theme) */
 
 body {
   background-color: #013220;
@@ -17,7 +17,7 @@ h1 {
   text-shadow: none;
 }
 
-/* 🕒 Clock (keeps red glow for focus) */
+/* 🕒 Clock (keeps red glow) */
 #clock {
   font-size: 100px;
   color: red;
@@ -30,7 +30,7 @@ h1 {
   text-shadow: none;
 }
 
-/* ✨ Orange Pulse Animation (kept for borders/buttons) */
+/* ✨ Orange Pulse Animation (for table borders/buttons) */
 @keyframes orangePulse {
   0%, 100% {
     box-shadow: 0 0 10px #ffaa00, 0 0 20px orange;
@@ -52,11 +52,11 @@ th, td {
   border: 2px solid #ffaa00;
   padding: 10px;
   text-align: center;
+  color: orange;
 }
 
 th {
   font-size: 24px;
-  color: white;
   background-color: rgba(255, 165, 0, 0.1);
   animation: orangePulse 4s infinite ease-in-out;
 }
@@ -82,7 +82,7 @@ th {
 /* 🧩 Buttons */
 .admin-btn, .save-btn {
   background-color: #0f5132;
-  color: white;
+  color: orange;
   border: none;
   padding: 10px 20px;
   margin: 5px;
@@ -115,7 +115,7 @@ th {
   min-width: 300px;
   margin-left: -150px;
   background-color: rgba(255, 140, 0, 0.95);
-  color: white;
+  color: orange;
   text-align: center;
   border-radius: 8px;
   padding: 16px;
