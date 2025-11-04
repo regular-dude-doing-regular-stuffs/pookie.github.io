@@ -1,4 +1,4 @@
-/* 🌿 Pookie Boss Timer Stylesheet (Dark Green + Full Orange Text Theme) */
+/* 🌿 Pookie Boss Timer Stylesheet (Dark Green + Orange Theme + Yellow Title) */
 
 body {
   background-color: #013220;
@@ -9,15 +9,13 @@ body {
   padding: 0;
 }
 
-/* 🔶 Title */
-/* 🔶 Title */
+/* 🟡 Title (Yellow) */
 h1 {
   font-size: 50px;
   margin-top: 20px;
-  color: yellow; /* Title now yellow */
+  color: yellow;
   text-shadow: none;
 }
-
 
 /* 🕒 Clock (keeps red glow) */
 #clock {
@@ -125,13 +123,4 @@ th {
   left: 50%;
   bottom: -100px;
   font-size: 17px;
-  box-shadow: 0 0 20px #ffaa00, 0 0 40px orange;
-  transition: all 0.6s ease;
-  z-index: 100;
-}
-
-#toast.show {
-  visibility: visible;
-  bottom: 50px;
-}
-
+  box-
