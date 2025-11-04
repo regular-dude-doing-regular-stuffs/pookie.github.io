@@ -1,4 +1,4 @@
-/* 🌿 Pookie Boss Timer Stylesheet (Dark Green + Orange Text Theme) */
+/* 🌿 Pookie Boss Timer Stylesheet (Dark Green + Orange Text, No Glow on Letters) */
 
 body {
   background-color: #013220;
@@ -9,15 +9,15 @@ body {
   padding: 0;
 }
 
-/* 🔴 Title */
+/* 🔶 Title */
 h1 {
   font-size: 50px;
   margin-top: 20px;
   color: orange;
-  text-shadow: 0 0 25px orange, 0 0 40px #ff6600;
+  text-shadow: none;
 }
 
-/* 🕒 Clock */
+/* 🕒 Clock (still glowing for emphasis) */
 #clock {
   font-size: 100px;
   color: red;
@@ -26,17 +26,17 @@ h1 {
 
 #clock-label {
   color: orange;
-  text-shadow: 0 0 12px #ffaa00, 0 0 25px #ff6600;
   margin-bottom: 20px;
+  text-shadow: none;
 }
 
-/* ✨ Orange Pulse Animation */
+/* ✨ Orange Pulse Animation (kept for subtle background and border glow) */
 @keyframes orangePulse {
   0%, 100% {
-    box-shadow: 0 0 15px #ffaa00, 0 0 30px orange;
+    box-shadow: 0 0 10px #ffaa00, 0 0 20px orange;
   }
   50% {
-    box-shadow: 0 0 25px #ffcc33, 0 0 50px #ff9900;
+    box-shadow: 0 0 20px #ffcc33, 0 0 40px #ff9900;
   }
 }
 
@@ -45,7 +45,7 @@ table {
   width: 90%;
   margin: 20px auto;
   border-collapse: collapse;
-  box-shadow: 0 0 15px #ffaa00, 0 0 30px orange;
+  box-shadow: 0 0 15px #ffaa00;
 }
 
 th, td {
@@ -57,8 +57,7 @@ th, td {
 th {
   font-size: 24px;
   color: orange;
-  text-shadow: 0 0 10px #ffaa00;
-  background-color: rgba(255, 165, 0, 0.15);
+  background-color: rgba(255, 165, 0, 0.1);
   animation: orangePulse 4s infinite ease-in-out;
 }
 
@@ -67,13 +66,12 @@ th {
   font-size: 24px;
   font-weight: bold;
   color: orange;
-  transition: color 0.5s, text-shadow 0.5s;
+  transition: color 0.5s;
 }
 
 .countdown {
   font-size: 48px;
   color: orange;
-  text-shadow: 0 0 15px #ffaa00, 0 0 30px orange;
 }
 
 .respawn {
@@ -82,4 +80,8 @@ th {
 }
 
 /* 🧩 Buttons */
-.adm
+.admin-btn, .save-btn {
+  background-color: #0f5132;
+  color: orange;
+  border: none;
+  padding: 10px 20px
