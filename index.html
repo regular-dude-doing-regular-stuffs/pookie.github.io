@@ -32,7 +32,7 @@
         <th>BOSS</th>
         <th>COUNTDOWN TIMER</th>
         <th>RESPAWN TIME</th>
-        <th id="actions-header" style="display:none;">ACTIONS</th>
+        <th>ACTIONS</th>
       </tr>
     </thead>
     <tbody id="timer-body"></tbody>
@@ -102,15 +102,15 @@
           <td class="timer-name" style="color:${color}">${t.name}</td>
           <td class="countdown" id="timer-${i}">${formatTime(t.remaining)}</td>
           <td class="respawn" id="respawn-${i}">${respawnTime}</td>
-          ${adminMode ? `
-            <td>
+          <td>
+            ${adminMode ? `
               <button class="admin-btn" onclick="editTimer(${i})">Edit</button>
               <button class="admin-btn" onclick="jumpToTime(${i})">Jump To Time</button>
-            </td>` : ``}
+            ` : ""}
+          </td>
         `;
         tbody.appendChild(tr);
       });
-      document.getElementById("actions-header").style.display = adminMode ? "table-cell" : "none";
     }
 
     function tick() {
