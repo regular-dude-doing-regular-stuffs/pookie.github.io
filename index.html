@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Pookie Boss Timer</title>
 
-  <!-- external CSS -->
+  <!-- external CSS (linked as requested) -->
   <link rel="stylesheet" href="web.css">
 
   <!-- PWA manifest -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#013220">
 
-  <!-- Service worker registration -->
+  <!-- Service worker registration (PWA) -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
@@ -22,7 +22,7 @@
   </script>
 
   <style>
-    /* Small local styles for connection indicator placement */
+    /* small layout helpers for connection indicator */
     #topControls { position: relative; }
     #connection-status {
       position: absolute;
@@ -36,16 +36,16 @@
   </style>
 </head>
 <body>
-  <!-- Title and clock -->
+  <!-- Title & clock -->
   <h1>Boss Respawn Schedule</h1>
   <div id="clock-label">Philippine Time (UTC+8)</div>
   <div id="clock">--:--:-- --</div>
 
-  <!-- Top controls -->
+  <!-- top controls: admin login + persistent connection indicator (admin-only) -->
   <div id="topControls">
     <button id="admin-login" class="admin-btn">Admin Login</button>
 
-    <!-- Persistent Admin-only Connection Indicator -->
+    <!-- Connection Status Indicator (admin-only; persistent) -->
     <div id="connection-status" aria-live="polite" role="status">
       <span id="conn-dot" class="dot">🔴</span>
       <span id="conn-text">Disconnected from JSONBin</span>
@@ -64,32 +64,33 @@
       <tr>
         <th>BOSS</th>
         <th>COUNTDOWN TIMER</th>
-        <th>RESPAWN TIME (UTC)</th>
+        <th>RESPAWN TIME</th> <!-- now shows PH time (UTC+8) in short format -->
         <th>ACTIONS</th>
       </tr>
     </thead>
     <tbody id="timer-body"></tbody>
   </table>
 
-  <!-- Toast -->
+  <!-- Toast for notifications -->
   <div id="toast" role="status" aria-live="polite">✅ All changes saved successfully!</div>
 
   <script>
-  /**************************************************************************
-   * Pookie Boss Timer - Updated index.html
-   * - Respawn times fixed using `targetTime` (ms since epoch)
-   * - targetTime is synced to JSONBin so everyone sees exact same respawn
-   * - Respawn times displayed in UTC (full date+time with seconds)
-   * - JSONBin sync, admin connection test, auto-save on admin edits/add/jump
+  /**
+   * Pookie Boss Timer (final)
+   * - Respawn times are fixed per-timer via targetTime (ms epoch)
+   * - Respawn times displayed in Philippines time (UTC+8) in short format: "Nov 5, 2025 – 8:32 PM"
+   * - JSONBin sync embedded, connection test after admin login, auto re-test every 5 minutes
+   * - Auto-save on admin edits/jumps/adds
+   * - Persistent admin-only connection indicator (🟢 / 🔴)
    *
-   * Note: this file contains an embedded JSONBin master key (as requested).
-   **************************************************************************/
+   * NOTE: This file contains an embedded JSONBin master key as you requested.
+   */
 
   /* ------------------------
      Configuration (embedded)
      ------------------------ */
   const JSONBIN_URL = "https://api.jsonbin.io/v3/b/6909f9efae596e708f43d542";
-  const API_KEY = "$2a$10$WYyO8b2IWZgwFczllVFuXOKxWm7MVesk9dSXSb0g.0/CMFmB.e1vi"; // <-- embedded master key
+  const API_KEY = "$2a$10$WYyO8b2IWZgwFczllVFuXOKxWm7MVesk9dSXSb0g.0/CMFmB.e1vi"; // embedded master key
   const POLL_INTERVAL_MS = 10000; // 10s auto-refresh for viewers
   const CONNECTION_RETEST_MS = 5 * 60 * 1000; // 5 minutes re-check while admin logged in
   const PASSWORD = "Iamtoogood009";
@@ -100,14 +101,12 @@
   let adminMode = false;
   let connectionOK = false;
   let connectionRetestTimer = null;
-  let isApplyingRemote = false; // prevents loops when applying remote updates
+  let isApplyingRemote = false;
 
-  // timers array: each timer has { name, duration (seconds), targetTime (ms) }
-  // If loaded from older localStorage format, we'll compute targetTime from remaining.
+  // timers: { name, duration (seconds), targetTime (ms since epoch) }
   let timers = (function(){
     const saved = localStorage.getItem("pookieTimers");
     if (!saved) {
-      // default timers (with targetTime = now + duration)
       const now = Date.now();
       return [
         { name: "VENATUS", duration: 10 * 3600, targetTime: now + 10 * 3600 * 1000 },
@@ -117,20 +116,17 @@
     }
     try {
       const parsed = JSON.parse(saved);
-      // Support both old format (duration + remaining) and new (duration + targetTime)
       if (Array.isArray(parsed) && parsed.length) {
         return parsed.map(t => {
+          // normalize older formats if necessary
           if (t.targetTime) return { name: t.name, duration: t.duration, targetTime: t.targetTime };
-          // fallback: compute targetTime = now + remaining
-          if (t.remaining != null) {
-            return { name: t.name, duration: t.duration, targetTime: Date.now() + (t.remaining * 1000) };
-          }
-          // fallback: set targetTime = now + duration
-          return { name: t.name, duration: t.duration, targetTime: Date.now() + (t.duration * 1000) };
+          if (t.remaining != null) return { name: t.name, duration: t.duration, targetTime: Date.now() + (t.remaining * 1000) };
+          return { name: t.name, duration: t.duration, targetTime: Date.now() + t.duration * 1000 };
         });
       }
-    } catch (e) { console.warn("Failed parsing saved timers", e); }
-    // final fallback defaults
+    } catch (e) {
+      console.warn("Failed to parse saved timers:", e);
+    }
     const now = Date.now();
     return [
       { name: "VENATUS", duration: 10 * 3600, targetTime: now + 10 * 3600 * 1000 },
@@ -160,25 +156,22 @@
     return `${h}:${m}:${s}`;
   }
 
-  // Format full UTC date/time for respawn column
-  function formatFullUTC(ms) {
+  // Format short PH time (UTC+8) as "Nov 5, 2025 – 8:32 PM"
+  function formatShortPH(ms) {
     const d = new Date(ms);
-    // Use toLocaleString with timeZone UTC and include seconds
     return d.toLocaleString("en-US", {
-      timeZone: "UTC",
-      weekday: "long",
-      month: "long",
+      timeZone: "Asia/Manila",
+      month: "short",
       day: "numeric",
       year: "numeric",
-      hour: "2-digit",
+      hour: "numeric",
       minute: "2-digit",
-      second: "2-digit",
-      hour12: false
-    }) + " UTC";
+      hour12: true
+    }).replace(',', ' –'); // replace first comma with an en dash for "Nov 5 – 8:32 PM"
   }
 
   /* ------------------------
-     Clock (12-hour Philippine time) - displayed beneath title
+     Clock (12-hour PH time) - displayed beneath title
      ------------------------ */
   function updateClock() {
     const now = new Date().toLocaleTimeString("en-US", { timeZone: "Asia/Manila", hour12: true });
@@ -216,8 +209,8 @@
     tbody.innerHTML = "";
     timers.forEach((t, i) => {
       const remaining = getRemainingSec(t);
-      const respawnUTC = formatFullUTC(t.targetTime);
-      let color = "#00ff66"; // default vibrant green
+      const respawnPH = formatShortPH(t.targetTime);
+      let color = "#00ff66";
       if (remaining <= 60 * 20) color = "red";
       else if (remaining <= 60 * 60) color = "orange";
       else if (remaining <= 3 * 60 * 60) color = "yellow";
@@ -226,7 +219,7 @@
       tr.innerHTML = `
         <td class="timer-name" style="color:${color}">${escapeHtml(t.name)}</td>
         <td class="countdown" id="timer-${i}">${formatTime(remaining)}</td>
-        <td class="respawn" id="respawn-${i}">${respawnUTC}</td>
+        <td class="respawn" id="respawn-${i}">${respawnPH}</td>
         <td>
           ${adminMode ? `
             <button class="admin-btn" onclick="editTimer(${i})">Edit</button>
@@ -237,23 +230,22 @@
       tbody.appendChild(tr);
     });
 
-    // show/hide admin actions UI
+    // show/hide admin UI
     document.getElementById("admin-actions").style.display = adminMode ? "block" : "none";
     document.getElementById("connection-status").style.display = adminMode ? "block" : "none";
   }
 
   /* ------------------------
-     Countdown tick (recomputes remaining from targetTime each second)
-     - when a timer reaches zero, we advance targetTime by duration (loop)
-     - this ensures targetTime is always a fixed timestamp, and loops create a new fixed timestamp
+     Tick + loop handling
+     - compute remaining from targetTime each second
+     - when timer reaches/has passed zero, advance targetTime by duration repeatedly
      ------------------------ */
-  function tickAndHandleLoops() {
+  function tickAndLoop() {
     const now = Date.now();
     let changed = false;
     timers.forEach(t => {
       if (t.targetTime <= now) {
-        // loop: set next targetTime = previous targetTime + duration (keeps periodic schedule)
-        // Use while to handle long gaps (in case app was closed for long)
+        // advance targetTime forward by duration until it's in the future
         while (t.targetTime <= now) {
           t.targetTime += t.duration * 1000;
         }
@@ -261,16 +253,14 @@
       }
     });
     if (changed) {
-      // Persist locally; if admin and connected we'll push too in other flows
       localStorage.setItem("pookieTimers", JSON.stringify(timers));
     }
     renderTimers();
   }
-  setInterval(tickAndHandleLoops, 1000);
+  setInterval(tickAndLoop, 1000);
 
   /* ------------------------
-     JSONBin integration
-     - remote format: { timers: [ {name, duration, targetTime}, ... ], lastUpdated: ms }
+     JSONBin integration (fetch & push)
      ------------------------ */
   async function fetchBin() {
     try {
@@ -306,13 +296,12 @@
   }
 
   /* ------------------------
-     Apply remote state (replace local timers when remote differs)
-     - remote timers should contain targetTime; if not, convert as necessary
+     Pull remote and apply
+     - remote should have timers with targetTime; convert if needed
      ------------------------ */
   async function pullAndApplyRemote() {
     const remote = await fetchBin();
     if (!remote || !Array.isArray(remote.timers)) return;
-    // Map remote entries to local structure and ensure targetTime exists
     const remoteTimers = remote.timers.map(rt => {
       if (rt.targetTime) return { name: rt.name, duration: rt.duration, targetTime: rt.targetTime };
       if (rt.remaining != null) return { name: rt.name, duration: rt.duration, targetTime: Date.now() + rt.remaining * 1000 };
@@ -328,7 +317,7 @@
   }
 
   /* ------------------------
-     Initial remote pull on load (non-blocking)
+     Initial remote pull on load
      ------------------------ */
   (async () => {
     const remote = await fetchBin();
@@ -344,16 +333,14 @@
   })();
 
   /* ------------------------
-     Polling for viewers (pull remote periodically)
+     Viewer polling for updates
      ------------------------ */
   setInterval(() => {
     pullAndApplyRemote();
   }, POLL_INTERVAL_MS);
 
   /* ------------------------
-     Admin connection test and indicator
-     - testConnection() runs on admin login and updates indicator
-     - periodic silent re-test while admin logged in
+     Connection test & indicator (admin-only)
      ------------------------ */
   async function testConnection(showToastFlag = true) {
     try {
@@ -388,18 +375,17 @@
   }
 
   /* ------------------------
-     Admin login flow (runs connection test after login)
+     Admin login flow
+     - runs testConnection after successful login
+     - starts periodic re-tests every 5 minutes
      ------------------------ */
   function setAdminMode(on) {
     adminMode = on;
     document.getElementById("admin-actions").style.display = on ? "block" : "none";
     document.getElementById("connection-status").style.display = on ? "block" : "none";
     renderTimers();
-
     if (on) {
-      // immediate connection test (shows toast)
       testConnection(true);
-      // start periodic silent re-tests
       if (connectionRetestTimer) clearInterval(connectionRetestTimer);
       connectionRetestTimer = setInterval(() => testConnection(false), CONNECTION_RETEST_MS);
     } else {
@@ -416,23 +402,20 @@
       setAdminMode(true);
       localStorage.setItem("pookieAdmin", "true");
       showToast("Admin mode enabled", "success");
-      // run connection test and show toast (already done inside setAdminMode)
     } else {
       alert("Incorrect password!");
     }
   });
 
-  // restore admin UI (does not auto-run test unless admin re-logins)
+  // restore admin UI state if previously set (does not auto-run connection test)
   if (localStorage.getItem("pookieAdmin") === "true") {
     setAdminMode(true);
   }
 
   /* ------------------------
-     Admin actions (auto-save to JSONBin)
-     - editTimer(i): change name/duration -> recompute targetTime to now+duration
-     - jumpToTime(i): set targetTime = now + requestedRemaining
-     - add timer: set targetTime = now + duration
-     - Each change auto-pushes to JSONBin (if connected)
+     Admin actions: edit, jump, add
+     - Update timers' targetTime (fixed timestamp) on change
+     - Auto-push to JSONBin when connected
      ------------------------ */
   async function autoPushIfConnected() {
     if (!connectionOK) return false;
@@ -449,7 +432,7 @@
     if (newDuration && !isNaN(newDuration)) {
       const hours = Number(newDuration);
       timers[i].duration = Math.round(hours * 3600);
-      // set a new fixed targetTime = now + duration
+      // set new fixed targetTime = now + duration
       timers[i].targetTime = Date.now() + timers[i].duration * 1000;
     }
     localStorage.setItem("pookieTimers", JSON.stringify(timers));
@@ -462,13 +445,13 @@
   }
 
   async function jumpToTime(i) {
-    const newRemaining = prompt("Jump to remaining time (HH:MM:SS):", formatTime(getRemainingSec(timers[i])));
+    const currentRemaining = getRemainingSec(timers[i]);
+    const newRemaining = prompt("Jump to remaining time (HH:MM:SS):", formatTime(currentRemaining));
     if (!newRemaining) return;
     const parts = newRemaining.split(":").map(Number);
     if (parts.length !== 3 || parts.some(p => Number.isNaN(p))) return alert("Invalid format. Use HH:MM:SS");
     const secs = parts[0]*3600 + parts[1]*60 + parts[2];
-    // set fixed targetTime = now + secs
-    timers[i].targetTime = Date.now() + secs * 1000;
+    timers[i].targetTime = Date.now() + secs * 1000; // set fixed timestamp
     localStorage.setItem("pookieTimers", JSON.stringify(timers));
     renderTimers();
     if (!isApplyingRemote) {
@@ -505,14 +488,12 @@
   });
 
   /* ------------------------
-     Optional: expose helpers for debugging
+     Debug helpers (optional)
      ------------------------ */
   window._pookie = {
     getTimers: () => timers,
-    pushNow: async () => {
-      return await pushBin({ timers: timers, lastUpdated: Date.now() });
-    },
-    testConnectionNow: async () => testConnection(true)
+    pushNow: async () => await pushBin({ timers: timers, lastUpdated: Date.now() }),
+    testConnectionNow: async () => await testConnection(true)
   };
 
   </script>
