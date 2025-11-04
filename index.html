@@ -41,15 +41,22 @@
   <div id="toast">✅ All changes saved successfully!</div>
 
   <script>
+    // === CONFIGURATION (paste your API key into API_KEY variable before deploying) ===
+    const JSONBIN_URL = "https://api.jsonbin.io/v3/b/6909f9efae596e708f43d542";
+    const API_KEY = "PASTE_YOUR_JSONBIN_KEY_HERE"; // <- REPLACE with your JSONBin secret key locally
+    const POLL_INTERVAL_MS = 10000; // 10 seconds
     const PASSWORD = "Iamtoogood009";
     let adminMode = false;
+    let isApplyingRemote = false; // flag to avoid loops
 
-    const timers = JSON.parse(localStorage.getItem("pookieTimers")) || [
+    // Local timers cache (will be loaded from JSONBin on start)
+    let timers = [
       { name: "VENATUS", duration: 10 * 60 * 60, remaining: 10 * 60 * 60 },
       { name: "VIORENT", duration: 10 * 60 * 60, remaining: 10 * 60 * 60 },
       { name: "EGO", duration: 21 * 60 * 60, remaining: 21 * 60 * 60 }
     ];
 
+    // --- Utilities ---
     function formatTime(sec) {
       const h = String(Math.floor(sec / 3600)).padStart(2, "0");
       const m = String(Math.floor((sec % 3600) / 60)).padStart(2, "0");
@@ -57,7 +64,6 @@
       return `${h}:${m}:${s}`;
     }
 
-    // 🕒 Live Philippine clock
     function updateClock() {
       const now = new Date().toLocaleTimeString("en-US", { timeZone: "Asia/Manila", hour12: true });
       document.getElementById("clock").textContent = now;
@@ -65,8 +71,9 @@
     setInterval(updateClock, 1000);
     updateClock();
 
-    function showToast() {
+    function showToast(msg = "✅ All changes saved successfully!") {
       const toast = document.getElementById("toast");
+      toast.textContent = msg;
       toast.classList.add("show");
       setTimeout(() => toast.classList.remove("show"), 3000);
     }
@@ -87,6 +94,7 @@
       });
     }
 
+    // --- Rendering ---
     function renderTimers() {
       const tbody = document.getElementById("timer-body");
       tbody.innerHTML = "";
@@ -99,7 +107,7 @@
 
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td class="timer-name" style="color:${color}">${t.name}</td>
+          <td class="timer-name" style="color:${color}">${escapeHtml(t.name)}</td>
           <td class="countdown" id="timer-${i}">${formatTime(t.remaining)}</td>
           <td class="respawn" id="respawn-${i}">${respawnTime}</td>
           <td>
@@ -113,6 +121,11 @@
       });
     }
 
+    function escapeHtml(s){
+      return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+    }
+
+    // --- Countdown ticking ---
     function tick() {
       timers.forEach(t => {
         t.remaining--;
@@ -120,53 +133,155 @@
       });
       renderTimers();
     }
-
     setInterval(tick, 1000);
-    renderTimers();
 
-    function editTimer(i) {
+    // --- Remote sync with JSONBin ---
+    async function fetchBin() {
+      try {
+        const res = await fetch(JSONBIN_URL + "/latest");
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data && data.record ? data.record : data;
+      } catch (e) {
+        console.warn("Fetch bin failed:", e);
+        return null;
+      }
+    }
+
+    async function pushBin(obj) {
+      if (!API_KEY || API_KEY === "PASTE_YOUR_JSONBIN_KEY_HERE") {
+        console.warn("API key not set; not pushing to JSONBin.");
+        return false;
+      }
+      try {
+        const res = await fetch(JSONBIN_URL, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Master-Key": API_KEY
+          },
+          body: JSON.stringify(obj)
+        });
+        return res.ok;
+      } catch (e) {
+        console.warn("Push to bin failed:", e);
+        return false;
+      }
+    }
+
+    async function pullAndApply() {
+      const remote = await fetchBin();
+      if (!remote) return;
+      // basic merge: if remote.lastUpdated > local lastUpdated apply remote
+      // We will consider remote as source of truth unless local had very recent admin edits
+      if (JSON.stringify(remote.timers) !== JSON.stringify(timers)) {
+        isApplyingRemote = true;
+        timers = remote.timers.map(t=>Object.assign({}, t));
+        renderTimers();
+        isApplyingRemote = false;
+      }
+    }
+
+    // initial load
+    (async ()=>{
+      const remote = await fetchBin();
+      if (remote && remote.timers) {
+        timers = remote.timers.map(t=>Object.assign({}, t));
+      }
+      renderTimers();
+    })();
+
+    // Polling
+    setInterval(async ()=>{
+      await pullAndApply();
+    }, POLL_INTERVAL_MS);
+
+    // --- Admin actions (auto-save on change) ---
+    function setAdminMode(on) {
+      adminMode = on;
+      document.getElementById("admin-actions").style.display = on ? "block" : "none";
+      renderTimers();
+    }
+
+    document.getElementById("admin-login").onclick = async () => {
+      const pass = prompt("Enter Admin Password:");
+      if (pass === PASSWORD) {
+        setAdminMode(true);
+        localStorage.setItem("pookieAdmin","true");
+        showToast("Admin mode enabled");
+      } else {
+        alert("Incorrect password!");
+      }
+    };
+
+    // Restore persisted admin flag
+    if (localStorage.getItem("pookieAdmin")==="true") setAdminMode(true);
+
+    // edit timer -> auto-save
+    async function editTimer(i) {
       const newName = prompt("Enter new name:", timers[i].name);
       if (newName) timers[i].name = newName;
       const newDuration = prompt("Enter new duration in hours:", timers[i].duration / 3600);
       if (newDuration && !isNaN(newDuration)) {
-        timers[i].duration = newDuration * 3600;
+        timers[i].duration = Math.round(newDuration * 3600);
         timers[i].remaining = timers[i].duration;
       }
       renderTimers();
+      if (!isApplyingRemote) {
+        const payload = { timers: timers, lastUpdated: Date.now() };
+        const ok = await pushBin(payload);
+        if (ok) showToast("Auto-saved changes");
+      }
     }
 
-    function jumpToTime(i) {
+    async function jumpToTime(i) {
       const newRemaining = prompt("Jump to remaining time (hh:mm:ss):", formatTime(timers[i].remaining));
       if (newRemaining) {
         const [h, m, s] = newRemaining.split(":").map(Number);
         timers[i].remaining = h * 3600 + m * 60 + s;
       }
       renderTimers();
+      if (!isApplyingRemote) {
+        const payload = { timers: timers, lastUpdated: Date.now() };
+        const ok = await pushBin(payload);
+        if (ok) showToast("Auto-saved changes");
+      }
     }
 
-    document.getElementById("admin-login").onclick = () => {
-      const pass = prompt("Enter Admin Password:");
-      if (pass === PASSWORD) {
-        adminMode = true;
-        document.getElementById("admin-actions").style.display = "block";
-        renderTimers();
-      } else {
-        alert("Incorrect password!");
-      }
-    };
-
-    document.getElementById("add-timer").onclick = () => {
+    // add new timer (admin)
+    document.getElementById("add-timer").onclick = async () => {
       const name = prompt("Enter Boss Name:");
-      const duration = prompt("Enter Respawn Duration (hours):");
-      if (name && duration) {
-        timers.push({ name, duration: duration * 3600, remaining: duration * 3600 });
-        renderTimers();
+      const hoursRaw = prompt("Enter Loop Duration (hours):");
+      const hours = parseFloat(hoursRaw);
+      if (!name || !Number.isFinite(hours) || hours <= 0) return alert("Invalid input.");
+      const loopSecs = Math.round(hours * 3600);
+      timers.push({ name, duration: loopSecs, remaining: loopSecs });
+      renderTimers();
+      if (!isApplyingRemote) {
+        const payload = { timers: timers, lastUpdated: Date.now() };
+        const ok = await pushBin(payload);
+        if (ok) showToast("Auto-saved changes");
       }
     };
 
-    document.getElementById("save-timers").onclick = () => {
-      localStorage.setItem("pookieTimers", JSON.stringify(timers));
-      showToast();
+    // save button (also available) - still here as fallback
+    document.getElementById("save-timers").onclick = async ()=>{
+      const payload = { timers: timers, lastUpdated: Date.now() };
+      const ok = await pushBin(payload);
+      if (ok) showToast("Saved to JSONBin");
+      else alert("Save failed (check API key).");
+    };
+
+    // auto-persist admin flag on unload
+    window.addEventListener('beforeunload', ()=>{
+      if (adminMode) localStorage.setItem("pookieAdmin","true");
+      else localStorage.removeItem("pookieAdmin");
+    });
+
+    // expose helpers for debugging (optional)
+    window._pookie = {
+      getTimers: ()=>timers,
+      pushNow: async ()=> await pushBin({ timers: timers, lastUpdated: Date.now() })
     };
   </script>
 </body>

@@ -7,7 +7,7 @@
   "theme_color": "#013220",
   "icons": [
     {
-      "src": "pookie-icon.png",
+      "src": "boss-icon.png",
       "sizes": "512x512",
       "type": "image/png"
     }
