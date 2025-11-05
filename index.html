@@ -5,26 +5,24 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Pookie Boss Timer</title>
-  <link rel="manifest" href="manifest.json" />
+  <link rel="manifest" href="manifest.json">
   <style>
-    /* 🌿 Base Layout */
+    /* === Global Styles === */
     body {
       margin: 0;
-      font-family: "Courier New", monospace;
-      background-color: #013220;
-      color: #adff2f;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      height: 100vh;
-      overflow-x: hidden;
+      font-family: 'Courier New', monospace;
+      color: #00ff99;
+      background: #001a0f;
+      background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA...'); /* your Base64 background here */
+      background-attachment: fixed;
+      background-size: cover;
+      background-position: center;
       position: relative;
-      text-align: center;
+      overflow-x: hidden;
     }
 
 ```
-/* 🌄 Base64-Embedded Pixel Background + Overlay */
+/* Dark overlay */
 body::before {
   content: "";
   position: fixed;
@@ -32,147 +30,155 @@ body::before {
   left: 0;
   width: 100%;
   height: 100%;
-  background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA...');
-  background-size: cover;
-  background-attachment: fixed;
-  background-position: center;
-  z-index: -2;
-}
-body::after {
-  content: "";
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.15);
-  z-index: -1;
+  background: rgba(0,0,0,0.15);
+  pointer-events: none;
+  z-index: 0;
 }
 
-/* 🕹️ Header */
+/* === Header === */
 h1 {
-  font-size: 3em;
-  color: yellow;
-  text-shadow: 0 0 10px yellow;
+  text-align: center;
+  color: #00ff99;
+  text-shadow: 0 0 10px #00ff99, 0 0 20px #00ff99;
+  font-size: 2.5em;
   margin-top: 20px;
 }
+
 #clock {
-  font-size: 100px;
+  font-size: 4em;
+  text-align: center;
   color: red;
   font-weight: bold;
   text-shadow: 0 0 15px red;
+  margin: 10px 0;
 }
 
-/* 💡 Timer Table */
-table {
-  width: 80%;
-  border-collapse: collapse;
-  margin-top: 40px;
-  background-color: rgba(0, 0, 0, 0.4);
-  border-radius: 12px;
-}
-th, td {
-  padding: 15px;
-  text-align: center;
-  font-size: 24px;
-  color: #adff2f;
-}
-th {
-  border-bottom: 2px solid #adff2f;
-}
-.countdown {
-  font-size: 48px;
-  font-weight: 900;
-  text-shadow: 0 0 10px #adff2f;
-}
-.respawn {
-  font-size: 28px;
-  font-weight: bold;
-}
-
-/* 🧭 Floating Admin Buttons */
-#adminButtons {
-  position: relative;
-  display: none;
-  justify-content: center;
-  gap: 15px;
-  margin-top: 20px;
-}
-.admin-btn {
-  padding: 15px 25px;
-  font-size: 18px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  background-color: #014f2f;
-  color: #adff2f;
-  transition: transform 0.2s;
-}
-.admin-btn:hover {
-  transform: scale(1.05);
-  box-shadow: 0 0 10px #adff2f;
-}
-
-/* 👑 Admin Login + Status */
-#adminLogin {
+/* === Connection & Admin === */
+.top-right {
   position: fixed;
   top: 10px;
-  right: 20px;
-  background-color: #014f2f;
-  color: #adff2f;
-  border: none;
-  padding: 8px 15px;
-  border-radius: 8px;
-  cursor: pointer;
+  right: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  z-index: 20;
 }
 
 #connectionStatus {
-  position: fixed;
-  top: 10px;
-  right: 160px;
-  font-size: 18px;
+  font-size: 0.9em;
+  color: #00ff66;
+  font-weight: bold;
 }
 
-/* 🍞 Toast Messages */
-#toast {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%) translateY(100px);
-  background-color: rgba(0, 128, 128, 0.9);
-  color: white;
-  padding: 15px 25px;
-  border-radius: 10px;
-  font-weight: bold;
-  opacity: 0;
-  transition: all 0.5s ease;
-  z-index: 999;
+#connectionStatus.offline {
+  color: #ff4444;
 }
-#toast.show {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
+
+#adminLogin {
+  background: #004d26;
+  border: none;
+  color: #00ff99;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 0 8px #00ff99;
+  transition: all 0.3s ease;
+}
+
+#adminLogin:hover {
+  background: #00ff99;
+  color: #001a0f;
+}
+
+/* === Floating Buttons === */
+.floating-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 10px;
+}
+
+.floating-buttons button {
+  background: transparent;
+  border: 1px solid #00ff99;
+  color: #00ff99;
+  font-weight: bold;
+  border-radius: 10px;
+  padding: 8px 20px;
+  cursor: pointer;
+  box-shadow: 0 0 12px #00ff99;
+  transition: all 0.3s;
+}
+
+.floating-buttons button:hover {
+  background: #00ff99;
+  color: #001a0f;
+}
+
+/* === Table === */
+table {
+  margin: 40px auto;
+  border-collapse: collapse;
+  width: 85%;
+  background: rgba(0, 26, 15, 0.7);
+  box-shadow: 0 0 20px #00ff99;
+  border-radius: 15px;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+}
+
+th, td {
+  border: 1px solid #00ff99;
+  padding: 15px;
+  text-align: center;
+  font-weight: bold;
+  text-shadow: 0 0 6px #00ff99;
+}
+
+th {
+  background: rgba(0, 26, 15, 0.85);
+  color: #00ffcc;
+  font-size: 1.2em;
+}
+
+td {
+  font-size: 1.1em;
+}
+
+.respawn {
+  font-size: 1.2em;
+  font-weight: bold;
 }
 ```
 
   </style>
 </head>
-
 <body>
-  <h1>Boss Respawn Schedule</h1>
-  <div id="clock"></div>
-
-  <!-- 🧭 Connection + Admin Controls -->
-
-  <div id="connectionStatus">🟢 Connected to JSONBin</div>
-  <button id="adminLogin">Admin Login</button>
-  <div id="adminButtons">
-    <button class="admin-btn" id="addTimer"></button>
-    <button class="admin-btn" id="saveChanges"></button>
+  <!-- Connection + Admin -->
+  <div class="top-right">
+    <div id="connectionStatus">🟢 Connected to JSONBin</div>
+    <button id="adminLogin">Admin Login</button>
   </div>
 
-  <!-- 📋 Timer Table -->
+  <!-- Title + Clock -->
 
-  <table id="timerTable">
+  <h1>Boss Respawn Schedule</h1>
+  <p style="text-align:center; margin-top:-10px;">Philippine Time (UTC+8)</p>
+  <div id="clock">--:--:--</div>
+
+  <!-- Floating Buttons -->
+
+  <div class="floating-buttons">
+    <button id="addTimer">Add New Timer</button>
+    <button id="saveChanges">Save Changes</button>
+  </div>
+
+  <!-- Timer Table -->
+
+  <table id="bossTable">
     <thead>
       <tr>
         <th>BOSS</th>
@@ -180,151 +186,67 @@ th {
         <th>RESPAWN TIME</th>
       </tr>
     </thead>
-    <tbody></tbody>
+    <tbody id="timerBody">
+      <!-- Timers load here -->
+    </tbody>
   </table>
 
-  <div id="toast"></div>
+  <!-- === Scripts === -->
 
   <script>
-    /* ========== 🕒 Clock (PH Time, UTC+8) ========== */
+    // === Digital Clock ===
     function updateClock() {
       const now = new Date();
-      const utc8 = new Date(now.getTime() + 8 * 60 * 60 * 1000);
-      let hours = utc8.getUTCHours();
-      const minutes = String(utc8.getUTCMinutes()).padStart(2, "0");
-      const seconds = String(utc8.getUTCSeconds()).padStart(2, "0");
-      const ampm = hours >= 12 ? "PM" : "AM";
-      hours = hours % 12 || 12;
-      document.getElementById("clock").textContent = `${hours}:${minutes}:${seconds} ${ampm}`;
+      const options = { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true, timeZone: 'Asia/Manila' };
+      document.getElementById('clock').textContent = now.toLocaleTimeString('en-US', options);
     }
     setInterval(updateClock, 1000);
     updateClock();
 
-    /* ========== 📦 JSONBin Configuration ========== */
-    const BIN_URL = "https://api.jsonbin.io/v3/b/6909f9efae596e708f43d542";
-    const API_KEY = "$2a$10$WYyO8b2IWZgwFczllVFuXOKxWm7MVesk9dSXSb0g.0/CMFmB.e1vi";
-    let isAdmin = false;
-
-    /* ========== 💾 Toast Helper ========== */
-    function showToast(msg, success = true) {
-      const toast = document.getElementById("toast");
-      toast.style.backgroundColor = success ? "rgba(0,128,128,0.9)" : "rgba(255,0,0,0.9)";
-      toast.textContent = msg;
-      toast.classList.add("show");
-      setTimeout(() => toast.classList.remove("show"), 3000);
-    }
-
-    /* ========== 🧭 Connection Status Check ========== */
+    // === JSONBin Connection Test ===
     const connectionStatus = document.getElementById("connectionStatus");
-    async function checkConnection() {
+    const BIN_URL = "https://api.jsonbin.io/v3/b/your-bin-id";
+    const API_KEY = "$2a$10$WYyO8b2IWZgwFczllVFuXOKxWm7MVesk9dSXSb0g.0/CMFmB.e1vi";
+
+    async function testConnection() {
       try {
-        const res = await fetch(BIN_URL, { headers: { "X-Master-Key": API_KEY } });
-        if (res.ok) {
+        const response = await fetch(BIN_URL, { headers: { "X-Master-Key": API_KEY }});
+        if (response.ok) {
           connectionStatus.textContent = "🟢 Connected to JSONBin";
-        } else {
-          connectionStatus.textContent = "🔴 Disconnected from JSONBin";
-        }
+          connectionStatus.classList.remove("offline");
+        } else throw new Error("Connection failed");
       } catch {
         connectionStatus.textContent = "🔴 Disconnected from JSONBin";
+        connectionStatus.classList.add("offline");
       }
     }
-    checkConnection();
-    setInterval(checkConnection, 120000);
+    testConnection();
+    setInterval(testConnection, 600000); // every 10 minutes
 
-    /* ========== 🕹️ Admin Login ========== */
-    document.getElementById("adminLogin").addEventListener("click", () => {
-      const pwd = prompt("Enter Admin Password:");
-      if (pwd === "Iamtoogood009") {
-        isAdmin = true;
-        document.getElementById("adminButtons").style.display = "flex";
-        showToast("Admin Mode Activated");
-        checkConnection();
-      } else {
-        showToast("Access Denied", false);
-      }
-    });
-
-    /* ========== ⏱️ Timer Logic ========== */
-    let timers = [
-      { boss: "VENATUS", loopHours: 10, remaining: 10 * 60 * 60 },
-      { boss: "VIORENT", loopHours: 10, remaining: 10 * 60 * 60 },
-      { boss: "EGO", loopHours: 21, remaining: 21 * 60 * 60 },
+    // === Dummy Data Load ===
+    const timers = [
+      { boss: "VENATUS", countdown: "09:59:55", respawn: "Nov 6, 2025, 2:57 PM" },
+      { boss: "VIORENT", countdown: "09:59:55", respawn: "Nov 6, 2025, 2:57 PM" },
+      { boss: "EGO", countdown: "20:59:55", respawn: "Nov 7, 2025, 1:57 AM" }
     ];
 
-    function renderTimers() {
-      const tbody = document.querySelector("#timerTable tbody");
-      tbody.innerHTML = "";
-      const now = new Date();
-      const phNow = new Date(now.getTime() + 8 * 3600000);
+    const tbody = document.getElementById("timerBody");
+    timers.forEach(t => {
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td>${t.boss}</td>
+        <td>${t.countdown}</td>
+        <td class="respawn">${t.respawn}</td>
+      `;
+      tbody.appendChild(row);
+    });
 
-      timers.forEach((t) => {
-        const tr = document.createElement("tr");
-
-        const boss = document.createElement("td");
-        boss.textContent = t.boss;
-        tr.appendChild(boss);
-
-        const cd = document.createElement("td");
-        cd.classList.add("countdown");
-        cd.textContent = formatTime(t.remaining);
-        tr.appendChild(cd);
-
-        const respawn = document.createElement("td");
-        respawn.classList.add("respawn");
-        const respawnTime = new Date(phNow.getTime() + t.remaining * 1000);
-        respawn.textContent = respawnTime.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
-        tr.appendChild(respawn);
-
-        tbody.appendChild(tr);
+    // === PWA Service Worker ===
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("service-worker.js").then(() => {
+        console.log("✅ Service Worker Registered");
       });
     }
-
-    function formatTime(sec) {
-      const h = Math.floor(sec / 3600);
-      const m = Math.floor((sec % 3600) / 60);
-      const s = sec % 60;
-      return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-    }
-
-    function tick() {
-      timers.forEach((t) => {
-        t.remaining--;
-        if (t.remaining <= 0) t.remaining = t.loopHours * 3600;
-      });
-      renderTimers();
-    }
-
-    setInterval(tick, 1000);
-    renderTimers();
-
-    /* ========== 💾 JSONBin Sync (10min Auto-Save) ========== */
-    async function saveTimers() {
-      if (!isAdmin) return;
-      try {
-        await fetch(BIN_URL, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json", "X-Master-Key": API_KEY },
-          body: JSON.stringify({ timers }),
-        });
-        showToast("Changes Saved");
-      } catch {
-        showToast("Save Failed", false);
-      }
-    }
-    setInterval(saveTimers, 600000);
-
-    /* Buttons */
-    document.getElementById("saveChanges").onclick = saveTimers;
-    document.getElementById("addTimer").onclick = () => {
-      if (!isAdmin) return;
-      const name = prompt("Enter Boss Name:");
-      const hours = parseInt(prompt("Enter Loop Hours:"), 10);
-      if (name && hours) {
-        timers.push({ boss: name, loopHours: hours, remaining: hours * 3600 });
-        renderTimers();
-        showToast("Timer Added");
-      }
-    };
   </script>
 
 </body>
