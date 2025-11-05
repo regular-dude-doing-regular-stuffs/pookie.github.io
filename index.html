@@ -1,40 +1,260 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Pookie Boss Timer</title>
-<link rel="manifest" href="manifest.json" />
-<meta name="theme-color" content="#013220" />
-<script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js'));
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#003300" />
+  <link rel="manifest" href="manifest.json" />
+  <title>Boss Respawn Schedule</title>
+  <style>
+    body {
+      font-family: "Courier New", monospace;
+
+
+what am i supposed to do with this code? 
+      background-color: #002b11;
+      color: #00ff00;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+
+h1 {
+  color: yellow;
+  font-size: 2.5em;
+  margin-top: 20px;
 }
-</script>
-<style>
-body { font-family: sans-serif; background: #013220; color: #39FF14; text-align: center; margin: 0; }
-#clock { font-size: 80px; color: red; margin-top: 20px; }
-table { margin: 20px auto; border-collapse: collapse; width: 90%; max-width: 800px; }
-th, td { border: 1px solid rgba(255,255,255,0.2); padding: 10px; }
-button { background: rgba(15,81,50,0.6); color: #39FF14; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold; }
-#connection-status { position: fixed; top: 10px; right: 10px; }
-</style>
+
+#phTime {
+  color: #ff0000;
+  font-size: 4em;
+  font-weight: bold;
+  text-shadow: 0 0 15px red;
+  margin: 20px 0;
+}
+
+.subtitle {
+  font-size: 0.9em;
+  color: #aaffaa;
+  margin-top: -10px;
+}
+
+table {
+  margin: 20px auto;
+  border-collapse: collapse;
+  width: 70%;
+  background-color: #001a0a;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 0 15px #003300;
+}
+
+th, td {
+  padding: 14px;
+  border-bottom: 2px solid #00ff00;
+}
+
+th {
+  color: lime;
+  font-size: 1.1em;
+  font-weight: bold;
+}
+
+td {
+  color: #00ff55;
+  font-size: 1.3em;
+  font-weight: bold;
+  text-shadow: 0 0 8px #00ff55;
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+.action-btn {
+  background-color: #003300;
+  border: 1px solid #00ff00;
+  color: #00ff00;
+  font-weight: bold;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.action-btn:hover {
+  background-color: #00ff00;
+  color: #002b11;
+}
+
+.login-btn {
+  position: fixed;
+  top: 15px;
+  right: 15px;
+  background-color: #002b11;
+  color: #00ff00;
+  border: 1px solid #00ff00;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.login-btn:hover {
+  background-color: #00ff00;
+  color: #002b11;
+}
+
+.status {
+  position: fixed;
+  top: 20px;
+  right: 130px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9em;
+  color: lime;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: lime;
+}
+
+.offline .status-dot {
+  background-color: red;
+}
+
+.offline body {
+  background-color: #111;
+}
+
+
+  </style>
 </head>
 <body>
-<h1>Boss Respawn Schedule</h1>
-<div id="clock">--:--:--</div>
-<div id="connection-status">🟢 Connected</div>
-<table>
-<thead><tr><th>Boss</th><th>Countdown</th><th>Respawn Time</th><th>Actions</th></tr></thead>
-<tbody id="timer-body"></tbody>
-</table>
-<script>
-let timers = JSON.parse(localStorage.getItem("pookieTimers")||"[]");
-if(timers.length===0){timers=[{name:"VENATUS",duration:36000,targetTime:Date.now()+36000*1000},{name:"VIORENT",duration:36000,targetTime:Date.now()+36000*1000},{name:"EGO",duration:75600,targetTime:Date.now()+75600*1000}];}
-function render(){const tb=document.getElementById("timer-body");tb.innerHTML="";timers.forEach((t,i)=>{const r=Math.max(0,Math.ceil((t.targetTime-Date.now())/1000));const h=String(Math.floor(r/3600)).padStart(2,'0');const m=String(Math.floor((r%3600)/60)).padStart(2,'0');const s=String(r%60).padStart(2,'0');const tr=document.createElement("tr");tr.innerHTML=`<td>${t.name}</td><td>${h}:${m}:${s}</td><td>${new Date(t.targetTime).toLocaleString()}</td><td><button onclick="reset(${i})">Reset</button></td>`;tb.appendChild(tr);});}
-function reset(i){timers[i].targetTime=Date.now()+timers[i].duration*1000;localStorage.setItem("pookieTimers",JSON.stringify(timers));render();}
-function tick(){render();}
-setInterval(tick,1000);render();
-</script>
+  <div class="status"><div class="status-dot"></div><span id="statusText">Connected</span></div>
+  <button class="login-btn">Admin Login</button>
+
+  <h1>Boss Respawn Schedule</h1>
+  <div class="subtitle">Philippine Time (UTC+8)</div>
+  <div id="phTime">--:--:--</div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>BOSS</th>
+        <th>COUNTDOWN TIMER</th>
+        <th>RESPAWN TIME</th>
+        <th>ACTIONS</th>
+      </tr>
+    </thead>
+    <tbody id="bossTable"></tbody>
+  </table>
+
+  <script>
+    const JSON_URL = "https://api.jsonbin.io/v3/b/6737a5aead19ca34f8b35a9c/latest"; // replace with your JSONBin endpoint
+    let bossData = [];
+    let isOnline = true;
+    let lastFetched = 0;
+    const REFRESH_INTERVAL = 10 * 60 * 1000; // 10 minutes
+    const table = document.getElementById("bossTable");
+    const statusDot = document.querySelector(".status-dot");
+    const statusText = document.getElementById("statusText");
+
+    // Display Philippine Time
+    function updatePHTime() {
+      const options = { timeZone: "Asia/Manila", hour12: true, hour: "numeric", minute: "numeric", second: "numeric" };
+      document.getElementById("phTime").textContent = new Date().toLocaleTimeString("en-US", options);
+    }
+    setInterval(updatePHTime, 1000);
+    updatePHTime();
+
+    // Fetch boss data
+    async function fetchBossData() {
+      try {
+        const now = Date.now();
+        if (now - lastFetched < REFRESH_INTERVAL) return;
+        const res = await fetch(JSON_URL);
+        const json = await res.json();
+        bossData = json.record.bosses;
+        lastFetched = now;
+        localStorage.setItem("bossDataCache", JSON.stringify(bossData));
+        localStorage.setItem("lastFetched", lastFetched);
+        renderTable();
+      } catch {
+        console.warn("⚠️ Offline - using cached data");
+        const cached = localStorage.getItem("bossDataCache");
+        if (cached) bossData = JSON.parse(cached);
+        renderTable();
+      }
+    }
+
+    function renderTable() {
+      table.innerHTML = "";
+      bossData.forEach(boss => {
+        const row = document.createElement("tr");
+        const respawn = new Date(boss.respawn);
+        row.innerHTML = 
+          <td>${boss.name}</td>
+          <td class="countdown" data-time="${respawn}">--:--:--</td>
+          <td>${respawn.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true })}</td>
+          <td><button class="action-btn">Reset</button></td>;
+        table.appendChild(row);
+      });
+    }
+
+    function updateCountdowns() {
+      if (!isOnline) return; // freeze timers when offline
+      const now = new Date().getTime();
+      document.querySelectorAll(".countdown").forEach(el => {
+        const target = new Date(el.dataset.time).getTime();
+        let diff = target - now;
+        if (diff < 0) diff = 0;
+        const h = String(Math.floor(diff / (1000 * 60 * 60))).padStart(2, "0");
+        const m = String(Math.floor((diff / (1000 * 60)) % 60)).padStart(2, "0");
+        const s = String(Math.floor((diff / 1000) % 60)).padStart(2, "0");
+        el.textContent = ${h}:${m}:${s};
+      });
+    }
+    setInterval(updateCountdowns, 1000);
+
+    // Network handling
+    window.addEventListener("online", () => {
+      isOnline = true;
+      document.body.classList.remove("offline");
+      statusDot.style.backgroundColor = "lime";
+      statusText.textContent = "Connected";
+      fetchBossData();
+    });
+
+    window.addEventListener("offline", () => {
+      isOnline = false;
+      document.body.classList.add("offline");
+      statusDot.style.backgroundColor = "red";
+      statusText.textContent = "Offline (Frozen)";
+    });
+
+    // Initial load
+    fetchBossData();
+    setInterval(fetchBossData, REFRESH_INTERVAL);
+
+    // Register Service Worker for PWA
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker
+          .register("./service-worker.js")
+          .then(() => console.log("✅ Service Worker Registered"))
+          .catch(err => console.log("❌ Service Worker Failed:", err));
+      });
+    }
+  </script>
+
 </body>
 </html>
