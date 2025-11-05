@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Pookie Boss Timer</title>
 
-  <!-- external CSS (kept linked for editing) -->
+  <!-- linked external css (kept editable) -->
   <link rel="stylesheet" href="web.css">
 
   <!-- PWA manifest -->
@@ -22,15 +22,20 @@
   </script>
 
   <style>
-    /* Page base + background layers (background will be set via JS from BG_DATA_URI) */
-    html, body { height:100%; margin:0; padding:0; }
-    body { position:relative; overflow-x:hidden; background-color:#013220; font-weight:700; color:#39FF14; font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
+    /* -------------------------
+       Visual styles (lime-green #39FF14)
+       Reduced glow, stronger font weight
+       ------------------------- */
+    :root {
+      --lime: #39FF14;
+      --dark: #001a12;
+      --overlay: rgba(0,0,0,0.15);
+    }
+    html, body { height:100%; margin:0; padding:0; font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:#013220; color:var(--lime); font-weight:700; }
 
-    /* Fixed background element (holds the embedded image) */
+    /* Background container (image will be applied by JS for safe embedding) */
     #bg-fixed {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
+      position: fixed; inset: 0;
       background-size: cover;
       background-position: center center;
       background-repeat: no-repeat;
@@ -39,466 +44,523 @@
       will-change: background-position, transform;
       transform: translateZ(0);
     }
-
-    /* 15% dark overlay so text is readable */
+    /* 15% dark overlay for readability */
     #bg-overlay {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(0,0,0,0.15);
+      position: fixed; inset: 0;
+      background: var(--overlay);
       z-index: -2;
       pointer-events: none;
     }
 
-    /* Soft neon treatment, reduced glow for readability */
-    .neon-glow {
-      text-shadow: 0 0 8px rgba(57,255,20,0.18), 0 0 18px rgba(57,255,20,0.06);
-    }
+    /* Header */
+    h1 { text-align:center; color: yellow; font-weight:900; font-size:48px; margin:20px 0 6px; text-shadow: 0 0 8px rgba(255,255,0,0.2); }
+    #clock-label { text-align:center; color:var(--lime); margin-bottom:6px; }
+    #clock { text-align:center; font-size:100px; color:red; margin:0 0 18px; text-shadow: 0 0 12px rgba(255,0,0,0.28); font-weight:800; }
 
-    /* Slight soft outline for panels */
-    .soft-panel {
-      background: rgba(0,0,0,0.45);
-      border-radius: 8px;
-      padding: 8px;
-      box-shadow: 0 4px 18px rgba(0,0,0,0.45);
-      border: 1px solid rgba(57,255,20,0.06);
-      backdrop-filter: blur(2px);
-    }
+    /* Admin login button top-right */
+    #admin-login { position: fixed; top: 12px; right: 12px; z-index: 1000; background: rgba(15,81,50,0.6); color: var(--lime); border: 2px solid rgba(57,255,20,0.14); padding:10px 14px; border-radius:8px; cursor:pointer; font-weight:800; }
 
-    /* Table styling */
-    table { width: 90%; margin: 18px auto; border-collapse: collapse; }
-    thead th { padding: 14px; background: rgba(0,0,0,0.25); color: #39FF14; font-weight: 800; text-align: left; font-size: 18px; }
-    tbody td { padding: 14px; border-top: 1px solid rgba(255,255,255,0.03); vertical-align: middle; }
-    tbody tr { background: rgba(0,0,0,0.45); }
-    .timer-name { font-size: 20px; color: #39FF14; font-weight:700; }
-    .countdown { font-size: 48px; color:#39FF14; font-weight:800; letter-spacing:1px; }
-    .respawn { font-size:16px; color: #39FF14; font-weight:700; }
+    /* Connection status (always visible) */
+    #connection-status { position: fixed; right: 12px; top: 62px; z-index:1000; font-weight:800; color:var(--lime); }
+
+    /* Toast */
+    #toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 22px; z-index:3000; visibility:hidden; padding:10px 14px; border-radius:10px; font-weight:800; }
+
+    /* Table and panels */
+    .table-wrap { width: 95%; max-width:1200px; margin: 0 auto 40px; }
+    table { width:100%; border-collapse: collapse; font-weight:700; }
+    thead th { text-align:left; padding:12px; background: rgba(0,0,0,0.25); color:var(--lime); font-size:18px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    tbody tr { background: rgba(0,0,0,0.45); backdrop-filter: blur(2px); }
+    tbody td { padding:12px; border-top: 1px solid rgba(255,255,255,0.03); vertical-align: middle; }
+    .timer-name { font-size:20px; color:var(--lime); font-weight:800; }
+    .countdown { font-size:48px; color:var(--lime); font-weight:900; letter-spacing:1px; }
+    .respawn { font-size:20px; color:var(--lime); font-weight:900; }
 
     /* Buttons */
-    button.admin-btn, button.save-btn {
-      background: rgba(10,60,40,0.65);
-      color: #39FF14;
-      border: none;
-      padding: 8px 12px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: 700;
-    }
-    button.admin-btn:hover, button.save-btn:hover {
-      background: rgba(20,120,80,0.85);
-    }
-
-    /* Header + clock */
-    h1 { font-size: 48px; color: yellow; margin: 18px auto 6px; text-align:center; font-weight:900; }
-    #clock-label { text-align:center; color:#39FF14; margin-bottom:6px; }
-    #clock { font-size:100px; color: red; text-align:center; margin:0 auto 12px; text-shadow: 0 0 12px rgba(255,0,0,0.28); font-weight:800; }
-
-    /* Admin controls placement */
-    #topControls { position: relative; width: 100%; }
-    #admin-login { position: absolute; right: 12px; top: 12px; }
-    #connection-status { position: absolute; right: 12px; top: 58px; display: none; font-weight:800; }
-
-    /* Toast visible class expectation (web.css likely provides animations) */
-    #toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 24px; padding: 10px 16px; border-radius: 10px; background: rgba(0,0,0,0.6); color: #fff; z-index: 3000; }
+    .admin-btn, .save-btn { background: rgba(10,60,40,0.7); color:var(--lime); border:none; padding:8px 12px; border-radius:8px; cursor:pointer; font-weight:800; }
+    .admin-btn:hover, .save-btn:hover { background: rgba(25,135,84,0.85); }
 
     /* Responsive */
     @media (max-width: 800px) {
-      .countdown { font-size: 36px; }
-      #clock { font-size: 56px; }
-      h1 { font-size: 32px; }
-      table { width: 96%; }
+      #clock { font-size:56px; }
+      .countdown { font-size:36px; }
+      h1 { font-size:32px; }
     }
   </style>
 </head>
 <body>
-  <!-- Background layers (image set via JS) -->
+  <!-- Background layers (image applied by JS) -->
   <div id="bg-fixed" aria-hidden="true"></div>
   <div id="bg-overlay" aria-hidden="true"></div>
 
-  <!-- Title + Clock -->
-  <h1 class="neon-glow">Boss Respawn Schedule</h1>
+  <!-- Title & clock -->
+  <h1>Boss Respawn Schedule</h1>
   <div id="clock-label">Philippine Time (UTC+8)</div>
   <div id="clock">--:--:-- --</div>
 
-  <!-- Top controls -->
-  <div id="topControls">
-    <button id="admin-login" class="admin-btn">Admin Login</button>
-    <div id="connection-status" aria-live="polite" role="status">
-      <span id="conn-dot">🔴</span>
-      <span id="conn-text">Disconnected from JSONBin</span>
-    </div>
+  <!-- Admin login (top-right) -->
+  <button id="admin-login">Admin Login</button>
+
+  <!-- Connection status (persistent) -->
+  <div id="connection-status" aria-live="polite" role="status">
+    <span id="conn-dot">🔴</span> <span id="conn-text">Disconnected</span>
   </div>
 
   <!-- Admin actions -->
-  <div id="admin-actions" style="display:none; margin:12px auto; width:90%; text-align:right;">
+  <div id="admin-actions" style="display:none; width:95%; max-width:1200px; margin:12px auto; text-align:right;">
     <button id="add-timer" class="admin-btn">Add New Timer</button>
     <button id="save-timers" class="save-btn">Save Changes</button>
   </div>
 
   <!-- Timers table -->
-  <table id="timer-table" class="soft-panel" aria-label="Boss timers">
-    <thead>
-      <tr>
-        <th>BOSS</th>
-        <th>COUNTDOWN TIMER</th>
-        <th>RESPAWN TIME</th>
-        <th>ACTIONS</th>
-      </tr>
-    </thead>
-    <tbody id="timer-body"></tbody>
-  </table>
+  <div class="table-wrap">
+    <table aria-label="Boss timers">
+      <thead>
+        <tr>
+          <th>BOSS</th>
+          <th>COUNTDOWN TIMER</th>
+          <th>RESPAWN TIME</th>
+          <th>ACTIONS</th>
+        </tr>
+      </thead>
+      <tbody id="timer-body"></tbody>
+    </table>
+  </div>
 
   <!-- Toast -->
-  <div id="toast" role="status" aria-live="polite" style="visibility:hidden;">✅ All changes saved successfully!</div>
+  <div id="toast" role="status" aria-live="polite"></div>
 
-  <script>
-  /* ========================================================================
-     Pookie Boss Timer - Final JS
-     - Replace BG_DATA_URI below with the Base64 data URI you generated locally
-     - All other logic (timers, JSONBin sync, admin, toasts, parallax) included
-     ======================================================================== */
+<script>
+/*************************************************************************
+ * Pookie Boss Timer - FINAL
+ * - Base64 background: paste your data URI into BG_DATA_URI below
+ * - JSONBin embedded (private key)
+ * - Auto-loop timers + data repair for corrupted targetTimes
+ * - Connection status persists in localStorage
+ * - Admin-only writes, auto-push on edits/jumps/adds
+ * - Viewer polling every 10s; admin re-test every 2 minutes
+ *************************************************************************/
 
-  // ======= CONFIG =======
-  const JSONBIN_URL = "https://api.jsonbin.io/v3/b/6909f9efae596e708f43d542";
-  const API_KEY = "$2a$10$WYyO8b2IWZgwFczllVFuXOKxWm7MVesk9dSXSb0g.0/CMFmB.e1vi"; // embedded key as requested
-  const POLL_INTERVAL_MS = 10000;
-  const CONNECTION_RETEST_MS = 5 * 60 * 1000;
-  const PASSWORD = "Iamtoogood009";
-  const PARALLAX_SPEED = 0.15;
+ /* ------------------------
+    CONFIG
+    ------------------------ */
+const JSONBIN_URL = "https://api.jsonbin.io/v3/b/6909f9efae596e708f43d542";
+const API_KEY = "$2a$10$WYyO8b2IWZgwFczllVFuXOKxWm7MVesk9dSXSb0g.0/CMFmB.e1vi"; // embedded master key (private use)
+const POLL_INTERVAL_MS = 10000; // viewer poll
+const CONNECTION_RETEST_MS = 2 * 60 * 1000; // 2 minutes admin re-test
+const PASSWORD = "Iamtoogood009";
+const PARALLAX_SPEED = 0.15; // parallax multiplier
 
-  // ======= IMPORTANT: PASTE YOUR BASE64 DATA URI HERE =======
-  // Example: const BG_DATA_URI = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA..."
-  const BG_DATA_URI = "PASTE_YOUR_BASE64_DATA_URI_HERE";
+/* ======= IMPORTANT =======
+   Paste your optimized Base64 one-line data URI here (starts with "data:image/png;base64,")
+   Example: const BG_DATA_URI = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...";
+   Replace the placeholder string below with the full line from bg-data-uri.txt
+=========================== */
+const BG_DATA_URI = "PASTE_YOUR_BASE64_DATA_URI_HERE";
 
-  // ======= App state & defaults =======
-  let adminMode = false;
-  let connectionOK = false;
-  let connectionRetestTimer = null;
-  let isApplyingRemote = false;
+/* ------------------------
+   State
+   ------------------------ */
+let adminMode = false;
+let connectionOK = false;
+let connectionRetestTimer = null;
+let isApplyingRemote = false;
 
-  let timers = (function(){
-    const saved = localStorage.getItem("pookieTimers");
-    if (!saved) {
-      const now = Date.now();
-      return [
-        { name: "VENATUS", duration: 10 * 3600, targetTime: now + 10 * 3600 * 1000 },
-        { name: "VIORENT", duration: 10 * 3600, targetTime: now + 10 * 3600 * 1000 },
-        { name: "EGO", duration: 21 * 3600, targetTime: now + 21 * 3600 * 1000 }
-      ];
-    }
-    try {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed)) {
-        return parsed.map(t => {
-          if (t.targetTime) return { name: t.name, duration: t.duration, targetTime: t.targetTime };
-          if (t.remaining != null) return { name: t.name, duration: t.duration, targetTime: Date.now() + (t.remaining * 1000) };
-          return { name: t.name, duration: t.duration, targetTime: Date.now() + t.duration * 1000 };
-        });
-      }
-    } catch(e) {
-      console.warn("parse error", e);
-    }
+// timers: { name, duration (sec), targetTime (ms) }
+let timers = (function() {
+  const raw = localStorage.getItem("pookieTimers");
+  if (!raw) {
     const now = Date.now();
     return [
       { name: "VENATUS", duration: 10 * 3600, targetTime: now + 10 * 3600 * 1000 },
       { name: "VIORENT", duration: 10 * 3600, targetTime: now + 10 * 3600 * 1000 },
       { name: "EGO", duration: 21 * 3600, targetTime: now + 21 * 3600 * 1000 }
     ];
-  })();
-
-  // ======= Utilities =======
-  function escapeHtml(s) { return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;'); }
-  function getRemainingSec(timer) { return Math.max(0, Math.ceil((timer.targetTime - Date.now()) / 1000)); }
-  function fmtTime(sec) {
-    if (sec < 0) sec = 0;
-    const h = String(Math.floor(sec / 3600)).padStart(2,'0');
-    const m = String(Math.floor((sec % 3600) / 60)).padStart(2,'0');
-    const s = String(sec % 60).padStart(2,'0');
-    return `${h}:${m}:${s}`;
   }
-  function formatShortPH(ms) {
-    const d = new Date(ms);
-    const s = d.toLocaleString("en-US", { timeZone: "Asia/Manila", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
-    return s.replace(',', ' –');
-  }
-
-  // ======= Clock =======
-  function updateClock() {
-    const now = new Date().toLocaleTimeString("en-US", { timeZone: "Asia/Manila", hour12: true });
-    document.getElementById("clock").textContent = now;
-  }
-  setInterval(updateClock, 1000);
-  updateClock();
-
-  // ======= Toast helper =======
-  function showToast(message, type = "success") {
-    const toast = document.getElementById("toast");
-    toast.textContent = message;
-    toast.style.visibility = "visible";
-    if (type === "success") {
-      toast.style.background = "linear-gradient(90deg, rgba(0,255,170,0.12), rgba(0,255,170,0.06))";
-      toast.style.color = "#001f00";
-      toast.style.border = "1px solid rgba(0,255,170,0.25)";
-    } else {
-      toast.style.background = "linear-gradient(90deg, rgba(255,20,20,0.14), rgba(255,50,50,0.06))";
-      toast.style.color = "#2a0000";
-      toast.style.border = "1px solid rgba(255,20,20,0.25)";
-    }
-    toast.classList.add("show");
-    setTimeout(() => {
-      toast.classList.remove("show");
-      toast.style.visibility = "hidden";
-    }, 3000);
-  }
-
-  // ======= Render timers =======
-  function renderTimers() {
-    const tbody = document.getElementById("timer-body");
-    tbody.innerHTML = "";
-    timers.forEach((t, i) => {
-      const remaining = getRemainingSec(t);
-      const respawnPH = formatShortPH(t.targetTime);
-      let color = "#39FF14";
-      if (remaining <= 60 * 20) color = "red";
-      else if (remaining <= 60 * 60) color = "orange";
-      else if (remaining <= 3 * 60 * 60) color = "yellow";
-
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td class="timer-name" style="color:${color}">${escapeHtml(t.name)}</td>
-        <td class="countdown" id="timer-${i}">${fmtTime(remaining)}</td>
-        <td class="respawn" id="respawn-${i}"><strong>${respawnPH}</strong></td>
-        <td>
-          ${adminMode ? `<button class="admin-btn" onclick="editTimer(${i})">Edit</button>
-                         <button class="admin-btn" onclick="jumpToTime(${i})">Jump To Time</button>` : ""}
-        </td>
-      `;
-      tbody.appendChild(tr);
-    });
-
-    document.getElementById("admin-actions").style.display = adminMode ? "block" : "none";
-    document.getElementById("connection-status").style.display = adminMode ? "block" : "none";
-  }
-
-  // ======= Tick & loop =======
-  function tickAndLoop() {
-    const now = Date.now();
-    let changed = false;
-    timers.forEach(t => {
-      if (t.targetTime <= now) {
-        while (t.targetTime <= now) {
-          t.targetTime += t.duration * 1000;
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      // Repair invalid targetTime values to avoid NaN/Invalid Date
+      return parsed.map(t => {
+        const safeName = t.name || "UNKNOWN";
+        const safeDuration = Number.isFinite(Number(t.duration)) ? Number(t.duration) : 10 * 3600;
+        const maybeTarget = Number(t.targetTime);
+        if (!Number.isFinite(maybeTarget) || maybeTarget <= 0) {
+          // If invalid, compute a fresh targetTime = now + remaining if present, else now+duration
+          if (t.remaining != null && Number.isFinite(Number(t.remaining))) {
+            return { name: safeName, duration: safeDuration, targetTime: Date.now() + Number(t.remaining) * 1000 };
+          }
+          return { name: safeName, duration: safeDuration, targetTime: Date.now() + safeDuration * 1000 };
         }
-        changed = true;
+        return { name: safeName, duration: safeDuration, targetTime: maybeTarget };
+      });
+    }
+  } catch(e) {
+    console.warn("Failed parsing saved timers, resetting to defaults", e);
+  }
+  // fallback defaults
+  const now = Date.now();
+  return [
+    { name: "VENATUS", duration: 10 * 3600, targetTime: now + 10 * 3600 * 1000 },
+    { name: "VIORENT", duration: 10 * 3600, targetTime: now + 10 * 3600 * 1000 },
+    { name: "EGO", duration: 21 * 3600, targetTime: now + 21 * 3600 * 1000 }
+  ];
+})();
+
+/* ------------------------
+   Utilities
+   ------------------------ */
+function escapeHtml(s) { return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;'); }
+function getRemainingSec(timer) { return Math.max(0, Math.ceil((timer.targetTime - Date.now()) / 1000)); }
+function formatRemaining(sec) {
+  if (sec < 0) sec = 0;
+  const h = String(Math.floor(sec / 3600)).padStart(2,'0');
+  const m = String(Math.floor((sec % 3600) / 60)).padStart(2,'0');
+  const s = String(sec % 60).padStart(2,'0');
+  return `${h}:${m}:${s}`;
+}
+function formatShortPH(ms) {
+  const d = new Date(ms);
+  return d.toLocaleString("en-US", {
+    timeZone: "Asia/Manila",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true
+  }).replace(',', ' –');
+}
+
+/* ------------------------
+   Header clock (PH time)
+   ------------------------ */
+function updateClock() {
+  document.getElementById("clock").textContent = new Date().toLocaleTimeString("en-US", { timeZone: "Asia/Manila", hour12: true });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+/* ------------------------
+   Toast helper (teal/red)
+   ------------------------ */
+function showToast(message, type = "success") {
+  const toast = document.getElementById("toast");
+  toast.textContent = message;
+  if (type === "success") {
+    toast.style.background = "linear-gradient(90deg, rgba(0,255,170,0.12), rgba(0,255,170,0.06))";
+    toast.style.color = "#001f00";
+    toast.style.border = "1px solid rgba(0,255,170,0.25)";
+  } else {
+    toast.style.background = "linear-gradient(90deg, rgba(255,20,20,0.14), rgba(255,50,50,0.06))";
+    toast.style.color = "#2a0000";
+    toast.style.border = "1px solid rgba(255,20,20,0.25)";
+  }
+  toast.style.visibility = "visible";
+  toast.classList.add("show");
+  setTimeout(() => { toast.classList.remove("show"); toast.style.visibility = "hidden"; }, 3000);
+}
+
+/* ------------------------
+   Render timers table
+   ------------------------ */
+function renderTimers() {
+  const tbody = document.getElementById("timer-body");
+  tbody.innerHTML = "";
+  timers.forEach((t, i) => {
+    const remaining = getRemainingSec(t);
+    const respawnPH = formatShortPH(t.targetTime);
+    let color = "#39FF14";
+    if (remaining <= 60 * 20) color = "red";
+    else if (remaining <= 60 * 60) color = "orange";
+    else if (remaining <= 3 * 60 * 60) color = "yellow";
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="timer-name" style="color:${color}">${escapeHtml(t.name)}</td>
+      <td class="countdown" id="timer-${i}">${formatRemaining(remaining)}</td>
+      <td class="respawn" id="respawn-${i}"><strong>${respawnPH}</strong></td>
+      <td>
+        ${adminMode ? `<button class="admin-btn" onclick="editTimer(${i})">Edit</button>
+                       <button class="admin-btn" onclick="jumpToTime(${i})">Jump To Time</button>` : ""}
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById("admin-actions").style.display = adminMode ? "block" : "none";
+  document.getElementById("connection-status").style.display = adminMode ? "block" : "none";
+}
+
+/* ------------------------
+   Tick & auto-loop
+   ------------------------ */
+function tickAndLoop() {
+  const now = Date.now();
+  let changed = false;
+  timers.forEach(t => {
+    if (t.targetTime <= now) {
+      // advance targetTime forward by duration until it's in the future
+      while (t.targetTime <= now) {
+        t.targetTime += t.duration * 1000;
       }
+      changed = true;
+    }
+  });
+  if (changed) localStorage.setItem("pookieTimers", JSON.stringify(timers));
+  renderTimers();
+}
+setInterval(tickAndLoop, 1000);
+
+/* ------------------------
+   JSONBin integration
+   ------------------------ */
+async function fetchBin() {
+  try {
+    const res = await fetch(JSONBIN_URL + "/latest", {
+      method: "GET",
+      headers: { "Content-Type": "application/json", "X-Master-Key": API_KEY }
     });
-    if (changed) localStorage.setItem("pookieTimers", JSON.stringify(timers));
+    if (!res.ok) throw new Error(res.status + " " + res.statusText);
+    const json = await res.json();
+    return json && json.record ? json.record : json;
+  } catch (err) {
+    console.warn("fetchBin error:", err);
+    return null;
+  }
+}
+
+async function pushBin(obj) {
+  try {
+    const res = await fetch(JSONBIN_URL, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "X-Master-Key": API_KEY },
+      body: JSON.stringify(obj)
+    });
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error(res.status + " " + res.statusText + " - " + txt);
+    }
+    return true;
+  } catch (err) {
+    console.warn("pushBin error:", err);
+    return false;
+  }
+}
+
+/* ------------------------
+   Pull remote & apply
+   ------------------------ */
+async function pullAndApplyRemote() {
+  const remote = await fetchBin();
+  if (!remote || !Array.isArray(remote.timers)) return;
+  const remoteTimers = remote.timers.map(rt => {
+    if (rt.targetTime) return { name: rt.name, duration: rt.duration, targetTime: rt.targetTime };
+    if (rt.remaining != null) return { name: rt.name, duration: rt.duration, targetTime: Date.now() + rt.remaining * 1000 };
+    return { name: rt.name, duration: rt.duration, targetTime: Date.now() + rt.duration * 1000 };
+  });
+  if (JSON.stringify(remoteTimers) !== JSON.stringify(timers)) {
+    isApplyingRemote = true;
+    timers = remoteTimers.map(t => Object.assign({}, t));
+    localStorage.setItem("pookieTimers", JSON.stringify(timers));
     renderTimers();
+    isApplyingRemote = false;
   }
-  setInterval(tickAndLoop, 1000);
+}
 
-  // ======= JSONBin helpers =======
-  async function fetchBin() {
-    try {
-      const res = await fetch(JSONBIN_URL + "/latest", { method: "GET", headers: { "Content-Type": "application/json", "X-Master-Key": API_KEY }});
-      if (!res.ok) throw new Error(res.status + " " + res.statusText);
-      const json = await res.json();
-      return json && json.record ? json.record : json;
-    } catch (e) { console.warn("fetchBin error", e); return null; }
-  }
-
-  async function pushBin(payload) {
-    try {
-      const res = await fetch(JSONBIN_URL, { method: "PUT", headers: { "Content-Type": "application/json", "X-Master-Key": API_KEY }, body: JSON.stringify(payload) });
-      if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(res.status + " " + res.statusText + " - " + txt);
-      }
-      return true;
-    } catch (e) { console.warn("pushBin error", e); return false; }
-  }
-
-  async function pullAndApplyRemote() {
-    const remote = await fetchBin();
-    if (!remote || !Array.isArray(remote.timers)) return;
-    const remoteTimers = remote.timers.map(rt => {
+/* Initial remote pull on load */
+(async () => {
+  const remote = await fetchBin();
+  if (remote && Array.isArray(remote.timers)) {
+    timers = remote.timers.map(rt => {
       if (rt.targetTime) return { name: rt.name, duration: rt.duration, targetTime: rt.targetTime };
       if (rt.remaining != null) return { name: rt.name, duration: rt.duration, targetTime: Date.now() + rt.remaining * 1000 };
       return { name: rt.name, duration: rt.duration, targetTime: Date.now() + rt.duration * 1000 };
     });
-    if (JSON.stringify(remoteTimers) !== JSON.stringify(timers)) {
-      isApplyingRemote = true;
-      timers = remoteTimers.map(t => Object.assign({}, t));
-      localStorage.setItem("pookieTimers", JSON.stringify(timers));
-      renderTimers();
-      isApplyingRemote = false;
-    }
-  }
-
-  (async () => {
-    const remote = await fetchBin();
-    if (remote && Array.isArray(remote.timers)) {
-      timers = remote.timers.map(rt => {
-        if (rt.targetTime) return { name: rt.name, duration: rt.duration, targetTime: rt.targetTime };
-        if (rt.remaining != null) return { name: rt.name, duration: rt.duration, targetTime: Date.now() + rt.remaining * 1000 };
-        return { name: rt.name, duration: rt.duration, targetTime: Date.now() + rt.duration * 1000 };
-      });
-      localStorage.setItem("pookieTimers", JSON.stringify(timers));
-    }
-    renderTimers();
-  })();
-
-  setInterval(() => pullAndApplyRemote(), POLL_INTERVAL_MS);
-
-  // ======= Connection test & indicator =======
-  async function testConnection(showToastFlag = true) {
-    try {
-      const res = await fetch(JSONBIN_URL + "/latest", { method:"GET", headers: { "Content-Type": "application/json", "X-Master-Key": API_KEY }});
-      if (!res.ok) throw new Error(res.status + " " + res.statusText);
-      connectionOK = true; updateConnectionIndicator(true);
-      if (showToastFlag) showToast("✅ Connected to JSONBin", "success");
-      return true;
-    } catch (e) {
-      connectionOK = false; updateConnectionIndicator(false);
-      if (showToastFlag) showToast("❌ Failed to connect — check API key or bin URL", "error");
-      console.warn("connection test failed", e);
-      return false;
-    }
-  }
-
-  function updateConnectionIndicator(ok) {
-    const dot = document.getElementById("conn-dot");
-    const txt = document.getElementById("conn-text");
-    if (ok) { dot.textContent = "🟢"; txt.textContent = "Connected to JSONBin"; }
-    else { dot.textContent = "🔴"; txt.textContent = "Disconnected from JSONBin"; }
-  }
-
-  // ======= Admin login flow =======
-  function setAdminMode(on) {
-    adminMode = on;
-    document.getElementById("admin-actions").style.display = on ? "block" : "none";
-    document.getElementById("connection-status").style.display = on ? "block" : "none";
-    renderTimers();
-    if (on) {
-      testConnection(true);
-      if (connectionRetestTimer) clearInterval(connectionRetestTimer);
-      connectionRetestTimer = setInterval(() => testConnection(false), CONNECTION_RETEST_MS);
-    } else {
-      if (connectionRetestTimer) { clearInterval(connectionRetestTimer); connectionRetestTimer = null; }
-    }
-  }
-
-  document.getElementById("admin-login").addEventListener("click", async () => {
-    const pass = prompt("Enter Admin Password:");
-    if (pass === PASSWORD) {
-      setAdminMode(true);
-      localStorage.setItem("pookieAdmin", "true");
-      showToast("Admin mode enabled", "success");
-    } else {
-      alert("Incorrect password!");
-    }
-  });
-
-  if (localStorage.getItem("pookieAdmin") === "true") setAdminMode(true);
-
-  // ======= Admin actions: edit / jump / add / save =======
-  async function autoPushIfConnected() {
-    if (!connectionOK) return false;
-    if (isApplyingRemote) return false;
-    const payload = { timers: timers, lastUpdated: Date.now() };
-    const ok = await pushBin(payload);
-    return ok;
-  }
-
-  async function editTimer(i) {
-    const newName = prompt("Enter new name:", timers[i].name);
-    if (newName) timers[i].name = newName;
-    const newDuration = prompt("Enter new duration in hours:", (timers[i].duration/3600).toString());
-    if (newDuration && !isNaN(newDuration)) {
-      const hours = Number(newDuration);
-      timers[i].duration = Math.round(hours * 3600);
-      timers[i].targetTime = Date.now() + timers[i].duration * 1000; // immediate targetTime
-    }
     localStorage.setItem("pookieTimers", JSON.stringify(timers));
-    renderTimers();
-    if (!isApplyingRemote) {
-      const ok = await autoPushIfConnected();
-      if (ok) showToast("Auto-saved changes", "success");
-      else if (connectionOK === false) showToast("Auto-save failed (disconnected)", "error");
-    }
   }
+  renderTimers();
+})();
 
-  async function jumpToTime(i) {
-    const currentRemaining = getRemainingSec(timers[i]);
-    const newRemaining = prompt("Jump to remaining time (HH:MM:SS):", fmtTime(currentRemaining));
-    if (!newRemaining) return;
-    const parts = newRemaining.split(":").map(Number);
-    if (parts.length !== 3 || parts.some(p => Number.isNaN(p))) return alert("Invalid format. Use HH:MM:SS");
-    const secs = parts[0]*3600 + parts[1]*60 + parts[2];
-    timers[i].targetTime = Date.now() + secs * 1000; // immediate update
-    localStorage.setItem("pookieTimers", JSON.stringify(timers));
-    renderTimers();
-    if (!isApplyingRemote) {
-      const ok = await autoPushIfConnected();
-      if (ok) showToast("Auto-saved changes", "success");
-      else if (connectionOK === false) showToast("Auto-save failed (disconnected)", "error");
-    }
+/* Viewer polling */
+setInterval(() => pullAndApplyRemote(), POLL_INTERVAL_MS);
+
+/* ------------------------
+   Connection test & persistent status
+   ------------------------ */
+function updateConnectionIndicator(ok) {
+  const dot = document.getElementById("conn-dot");
+  const txt = document.getElementById("conn-text");
+  dot.textContent = ok ? "🟢" : "🔴";
+  txt.textContent = ok ? "Connected to JSONBin" : "Disconnected from JSONBin";
+  localStorage.setItem("pookieConnOK", ok ? "1" : "0"); // persist last status
+}
+
+/* Load persisted connection status on startup */
+(function loadPersistedConnection() {
+  const prev = localStorage.getItem("pookieConnOK");
+  if (prev === "1") updateConnectionIndicator(true);
+  else updateConnectionIndicator(false);
+})();
+
+async function testConnection(showToastFlag = true) {
+  try {
+    const res = await fetch(JSONBIN_URL + "/latest", {
+      method: "GET",
+      headers: { "Content-Type": "application/json", "X-Master-Key": API_KEY }
+    });
+    if (!res.ok) throw new Error(res.status + " " + res.statusText);
+    connectionOK = true;
+    updateConnectionIndicator(true);
+    if (showToastFlag) showToast("✅ Connected to JSONBin", "success");
+    return true;
+  } catch (err) {
+    connectionOK = false;
+    updateConnectionIndicator(false);
+    if (showToastFlag) showToast("❌ Failed to connect — check API key or bin URL", "error");
+    console.warn("Connection test failed:", err);
+    return false;
   }
+}
 
-  document.getElementById("add-timer").addEventListener("click", async () => {
-    const name = prompt("Enter Boss Name:");
-    if (!name) return;
-    const hoursRaw = prompt("Enter Loop Duration (hours):", "10");
-    const hours = parseFloat(hoursRaw);
-    if (!hours || !Number.isFinite(hours) || hours <= 0) return alert("Invalid hours");
-    const loopSecs = Math.round(hours * 3600);
-    const newTimer = { name, duration: loopSecs, targetTime: Date.now() + loopSecs * 1000 };
-    timers.push(newTimer);
-    localStorage.setItem("pookieTimers", JSON.stringify(timers));
-    renderTimers();
-    if (!isApplyingRemote) {
-      const ok = await autoPushIfConnected();
-      if (ok) showToast("Auto-saved changes", "success");
-      else if (connectionOK === false) showToast("Auto-save failed (disconnected)", "error");
-    }
-  });
+/* ------------------------
+   Admin login flow (runs connection test and starts re-check timer)
+   ------------------------ */
+function setAdminMode(on) {
+  adminMode = on;
+  document.getElementById("admin-actions").style.display = on ? "block" : "none";
+  renderTimers();
+  if (on) {
+    testConnection(true);
+    if (connectionRetestTimer) clearInterval(connectionRetestTimer);
+    connectionRetestTimer = setInterval(() => testConnection(false), CONNECTION_RETEST_MS);
+  } else {
+    if (connectionRetestTimer) { clearInterval(connectionRetestTimer); connectionRetestTimer = null; }
+  }
+}
 
-  document.getElementById("save-timers").addEventListener("click", async () => {
-    if (!connectionOK) { showToast("Cannot save: disconnected from JSONBin", "error"); return; }
-    const ok = await pushBin({ timers: timers, lastUpdated: Date.now() });
-    if (ok) showToast("Saved to JSONBin", "success");
-    else showToast("Save failed: check API key", "error");
-  });
+document.getElementById("admin-login").addEventListener("click", async () => {
+  const pass = prompt("Enter Admin Password:");
+  if (pass === PASSWORD) {
+    setAdminMode(true);
+    localStorage.setItem("pookieAdmin", "true");
+    showToast("Admin mode enabled", "success");
+  } else {
+    alert("Incorrect password!");
+  }
+});
 
-  // ======= Parallax background setup (safe) =======
-  (function setupBackground() {
-    const bg = document.getElementById('bg-fixed');
-    if (!BG_DATA_URI || BG_DATA_URI === "PASTE_YOUR_BASE64_DATA_URI_HERE") {
-      // fallback solid color to avoid blank page
-      bg.style.backgroundImage = "none";
-      bg.style.backgroundColor = "#001a12";
-      return;
-    }
-    bg.style.backgroundImage = `url("${BG_DATA_URI}")`;
-    bg.style.backgroundPosition = "center center";
-    window.addEventListener('scroll', function() {
-      const sc = window.scrollY || window.pageYOffset;
-      const offset = sc * PARALLAX_SPEED;
-      // convert to percent for responsiveness
-      bg.style.backgroundPosition = `center ${50 + (offset / window.innerHeight * 100)}%`;
-    }, { passive: true });
-    // initial set
+// restore admin UI if previously set
+if (localStorage.getItem("pookieAdmin") === "true") {
+  setAdminMode(true);
+}
+
+/* ------------------------
+   Admin actions: edit/jump/add/save (auto-push if connected)
+   ------------------------ */
+async function autoPushIfConnected() {
+  if (!connectionOK) return false;
+  if (isApplyingRemote) return false;
+  const payload = { timers: timers, lastUpdated: Date.now() };
+  const ok = await pushBin(payload);
+  return ok;
+}
+
+async function editTimer(i) {
+  const newName = prompt("Enter new name:", timers[i].name);
+  if (newName) timers[i].name = newName;
+  const newDuration = prompt("Enter new duration in hours:", (timers[i].duration / 3600).toString());
+  if (newDuration && !isNaN(newDuration)) {
+    const hours = Number(newDuration);
+    timers[i].duration = Math.round(hours * 3600);
+    // Immediately set fixed targetTime = now + duration (header clock base)
+    timers[i].targetTime = Date.now() + timers[i].duration * 1000;
+  }
+  localStorage.setItem("pookieTimers", JSON.stringify(timers));
+  renderTimers();
+  if (!isApplyingRemote) {
+    const ok = await autoPushIfConnected();
+    if (ok) showToast("Auto-saved changes", "success");
+    else if (connectionOK === false) showToast("Auto-save failed (disconnected)", "error");
+  }
+}
+
+async function jumpToTime(i) {
+  const currentRemaining = getRemainingSec(timers[i]);
+  const newRemaining = prompt("Jump to remaining time (HH:MM:SS):", formatRemaining(currentRemaining));
+  if (!newRemaining) return;
+  const parts = newRemaining.split(":").map(Number);
+  if (parts.length !== 3 || parts.some(p => Number.isNaN(p))) return alert("Invalid format. Use HH:MM:SS");
+  const secs = parts[0] * 3600 + parts[1] * 60 + parts[2];
+  timers[i].targetTime = Date.now() + secs * 1000; // immediate update
+  localStorage.setItem("pookieTimers", JSON.stringify(timers));
+  renderTimers();
+  if (!isApplyingRemote) {
+    const ok = await autoPushIfConnected();
+    if (ok) showToast("Auto-saved changes", "success");
+    else if (connectionOK === false) showToast("Auto-save failed (disconnected)", "error");
+  }
+}
+
+document.getElementById("add-timer").addEventListener("click", async () => {
+  const name = prompt("Enter Boss Name:");
+  if (!name) return;
+  const hoursRaw = prompt("Enter Loop Duration (hours):", "10");
+  const hours = parseFloat(hoursRaw);
+  if (!hours || !Number.isFinite(hours) || hours <= 0) return alert("Invalid hours");
+  const loopSecs = Math.round(hours * 3600);
+  const newTimer = { name, duration: loopSecs, targetTime: Date.now() + loopSecs * 1000 };
+  timers.push(newTimer);
+  localStorage.setItem("pookieTimers", JSON.stringify(timers));
+  renderTimers();
+  if (!isApplyingRemote) {
+    const ok = await autoPushIfConnected();
+    if (ok) showToast("Auto-saved changes", "success");
+    else if (connectionOK === false) showToast("Auto-save failed (disconnected)", "error");
+  }
+});
+
+document.getElementById("save-timers").addEventListener("click", async () => {
+  if (!connectionOK) { showToast("Cannot save: disconnected from JSONBin", "error"); return; }
+  const ok = await pushBin({ timers: timers, lastUpdated: Date.now() });
+  if (ok) showToast("Saved to JSONBin", "success");
+  else showToast("Save failed: check API key", "error");
+});
+
+/* ------------------------
+   Parallax background setup (safe)
+   - Uses BG_DATA_URI injected above (paste your base64)
+   ------------------------ */
+(function setupBackground() {
+  const bg = document.getElementById('bg-fixed');
+  if (!BG_DATA_URI || BG_DATA_URI === "PASTE_YOUR_BASE64_DATA_URI_HERE") {
+    // fallback: solid color so page never appears blank
+    bg.style.backgroundImage = "none";
+    bg.style.backgroundColor = "#001a12";
+    return;
+  }
+  bg.style.backgroundImage = `url("${BG_DATA_URI}")`;
+  bg.style.backgroundPosition = "center center";
+
+  // parallax: update background-position by fraction of scroll
+  window.addEventListener('scroll', function() {
     const sc = window.scrollY || window.pageYOffset;
     const offset = sc * PARALLAX_SPEED;
     bg.style.backgroundPosition = `center ${50 + (offset / window.innerHeight * 100)}%`;
-  })();
+  }, { passive: true });
 
-  // Expose debug helpers
-  window._pookie = {
-    getTimers: () => timers,
-    pushNow: async () => await pushBin({ timers: timers, lastUpdated: Date.now() }),
-    testConnectionNow: async () => await testConnection(true)
-  };
-  </script>
+  // initial set
+  const sc = window.scrollY || window.pageYOffset;
+  const offset = sc * PARALLAX_SPEED;
+  bg.style.backgroundPosition = `center ${50 + (offset / window.innerHeight * 100)}%`;
+})();
+
+/* Expose debug helpers */
+window._pookie = {
+  getTimers: () => timers,
+  pushNow: async () => await pushBin({ timers: timers, lastUpdated: Date.now() }),
+  testConnectionNow: async () => await testConnection(true)
+};
+</script>
 </body>
 </html>
