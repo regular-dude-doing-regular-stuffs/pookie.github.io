@@ -40,7 +40,7 @@
     table {
       margin: 20px auto;
       border-collapse: collapse;
-      width: 70%;
+      width: 85%;
       background-color: #001a0a;
       border-radius: 10px;
       overflow: hidden;
@@ -127,10 +127,6 @@
       background-color: red;
     }
 
-    .offline body {
-      background-color: #111;
-    }
-
     .small-date {
       display: block;
       font-size: 0.8em;
@@ -160,16 +156,21 @@
   </table>
 
   <script>
-    const JSON_URL = "https://api.jsonbin.io/v3/b/6737a5aead19ca34f8b35a9c/latest";
+    // 🔗 JSONBin API details
+    const BIN_ID = "6737a5aead19ca34f8b35a9c";
+    const JSON_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}/latest`;
+    const JSON_WRITE_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
+    const API_KEY = "$2a$10$WYyO8b2IWZgwFczllVFuXOKxWm7MVesk9dSXSb0g.0/CMFmB.e1vi"; // 🔒 Master key
+
     let bossData = [];
     let isOnline = true;
     let lastFetched = 0;
-    const REFRESH_INTERVAL = 4 * 60 * 1000; // 🔄 4 minutes
+    const REFRESH_INTERVAL = 4 * 60 * 1000; // 4 minutes
     const table = document.getElementById("bossTable");
     const statusDot = document.querySelector(".status-dot");
     const statusText = document.getElementById("statusText");
 
-    // Display Philippine Time
+    // ⏰ Display Philippine Time
     function updatePHTime() {
       const options = { timeZone: "Asia/Manila", hour12: true, hour: "numeric", minute: "numeric", second: "numeric" };
       document.getElementById("phTime").textContent = new Date().toLocaleTimeString("en-US", options);
@@ -177,7 +178,7 @@
     setInterval(updatePHTime, 1000);
     updatePHTime();
 
-    // Fetch boss data
+    // 🔄 Fetch boss data
     async function fetchBossData() {
       try {
         const now = Date.now();
@@ -187,7 +188,6 @@
         bossData = json.record.bosses;
         lastFetched = now;
         localStorage.setItem("bossDataCache", JSON.stringify(bossData));
-        localStorage.setItem("lastFetched", lastFetched);
         renderTable();
       } catch {
         console.warn("⚠️ Offline - using cached data");
@@ -197,6 +197,29 @@
       }
     }
 
+    // 💾 Save data to JSONBin
+    async function saveBossData() {
+      if (!isOnline) {
+        console.warn("❌ Offline: Changes stored locally until reconnect");
+        localStorage.setItem("bossDataCache", JSON.stringify(bossData));
+        return;
+      }
+      try {
+        await fetch(JSON_WRITE_URL, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Master-Key": API_KEY,
+          },
+          body: JSON.stringify({ bosses: bossData }),
+        });
+        console.log("✅ Synced to JSONBin");
+      } catch (err) {
+        console.error("❌ Sync failed:", err);
+      }
+    }
+
+    // 🧱 Render Table
     function renderTable() {
       table.innerHTML = "";
       if (!bossData || bossData.length === 0) {
@@ -217,13 +240,16 @@
           </td>
           <td class="respawn-cell">${dateStr}</td>
           <td>
+            <button class="action-btn" onclick="editName(${index})">Edit Name</button>
             <button class="action-btn" onclick="adjustTime(${index})">Adjust Time</button>
+            <button class="action-btn" onclick="jumpTo(${index})">Jump To</button>
             <button class="action-btn" onclick="resetTimer(${index})">Reset</button>
           </td>`;
         table.appendChild(row);
       });
     }
 
+    // ⏱ Countdown updates
     function updateCountdowns() {
       if (!isOnline) return;
       const now = new Date().getTime();
@@ -242,23 +268,51 @@
     }
     setInterval(updateCountdowns, 1000);
 
-    function adjustTime(index) {
-      const newTime = prompt("Enter new respawn time (HH:MM, 24-hour format):");
+    // ✏️ Edit Name
+    async function editName(index) {
+      const newName = prompt("Enter new boss name:", bossData[index].name);
+      if (!newName) return;
+      bossData[index].name = newName.trim();
+      renderTable();
+      await saveBossData();
+    }
+
+    // 🕒 Adjust Time
+    async function adjustTime(index) {
+      const newTime = prompt("Enter new respawn time (HH:MM, 24-hour):");
       if (!newTime || !/^\d{1,2}:\d{2}$/.test(newTime)) return alert("Invalid format. Use HH:MM.");
       const [h, m] = newTime.split(":").map(Number);
       const now = new Date();
       const newRespawn = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
 
       bossData[index].respawn = newRespawn.toISOString();
-      localStorage.setItem("bossDataCache", JSON.stringify(bossData));
       renderTable();
+      await saveBossData();
     }
 
-    function resetTimer(index) {
-      alert(`Timer reset for ${bossData[index].name} (placeholder action).`);
+    // ⏩ Jump To a certain time (no loop reset)
+    async function jumpTo(index) {
+      const addMins = parseInt(prompt("Jump forward how many minutes?"), 10);
+      if (isNaN(addMins)) return;
+      const currentRespawn = new Date(bossData[index].respawn);
+      currentRespawn.setMinutes(currentRespawn.getMinutes() + addMins);
+      bossData[index].respawn = currentRespawn.toISOString();
+      renderTable();
+      await saveBossData();
     }
 
-    // Network handling
+    // 🔁 Reset Timer (syncs too)
+    async function resetTimer(index) {
+      const confirmReset = confirm(`Reset timer for ${bossData[index].name}?`);
+      if (!confirmReset) return;
+      const now = new Date();
+      now.setMinutes(now.getMinutes() + 30); // Example 30-minute respawn cycle
+      bossData[index].respawn = now.toISOString();
+      renderTable();
+      await saveBossData();
+    }
+
+    // 🌐 Network handling
     window.addEventListener("online", () => {
       isOnline = true;
       document.body.classList.remove("offline");
@@ -274,11 +328,11 @@
       statusText.textContent = "Offline (Frozen)";
     });
 
-    // Initial load
+    // 🧭 Initialize
     fetchBossData();
     setInterval(fetchBossData, REFRESH_INTERVAL);
 
-    // Register Service Worker for PWA
+    // ⚙️ PWA setup
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
         navigator.serviceWorker
