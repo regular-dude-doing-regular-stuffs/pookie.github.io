@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -10,9 +9,6 @@
   <style>
     body {
       font-family: "Courier New", monospace;
-
-
-what am i supposed to do with this code? 
       background-color: #002b11;
       color: #00ff00;
       text-align: center;
@@ -21,125 +17,125 @@ what am i supposed to do with this code?
       user-select: none;
     }
 
+    h1 {
+      color: yellow;
+      font-size: 2.5em;
+      margin-top: 20px;
+    }
 
-h1 {
-  color: yellow;
-  font-size: 2.5em;
-  margin-top: 20px;
-}
+    #phTime {
+      color: #ff0000;
+      font-size: 4em;
+      font-weight: bold;
+      text-shadow: 0 0 15px red;
+      margin: 20px 0;
+    }
 
-#phTime {
-  color: #ff0000;
-  font-size: 4em;
-  font-weight: bold;
-  text-shadow: 0 0 15px red;
-  margin: 20px 0;
-}
+    .subtitle {
+      font-size: 0.9em;
+      color: #aaffaa;
+      margin-top: -10px;
+    }
 
-.subtitle {
-  font-size: 0.9em;
-  color: #aaffaa;
-  margin-top: -10px;
-}
+    table {
+      margin: 20px auto;
+      border-collapse: collapse;
+      width: 70%;
+      background-color: #001a0a;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 0 15px #003300;
+    }
 
-table {
-  margin: 20px auto;
-  border-collapse: collapse;
-  width: 70%;
-  background-color: #001a0a;
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 0 15px #003300;
-}
+    th, td {
+      padding: 14px;
+      border-bottom: 2px solid #00ff00;
+    }
 
-th, td {
-  padding: 14px;
-  border-bottom: 2px solid #00ff00;
-}
+    th {
+      color: lime;
+      font-size: 1.1em;
+      font-weight: bold;
+    }
 
-th {
-  color: lime;
-  font-size: 1.1em;
-  font-weight: bold;
-}
+    td {
+      color: #00ff55;
+      font-size: 1.3em;
+      font-weight: bold;
+      text-shadow: 0 0 8px #00ff55;
+    }
 
-td {
-  color: #00ff55;
-  font-size: 1.3em;
-  font-weight: bold;
-  text-shadow: 0 0 8px #00ff55;
-}
+    tr:last-child td {
+      border-bottom: none;
+    }
 
-tr:last-child td {
-  border-bottom: none;
-}
+    .action-btn {
+      background-color: #003300;
+      border: 1px solid #00ff00;
+      color: #00ff00;
+      font-weight: bold;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
 
-.action-btn {
-  background-color: #003300;
-  border: 1px solid #00ff00;
-  color: #00ff00;
-  font-weight: bold;
-  padding: 6px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: 0.2s;
-}
+    .action-btn:hover {
+      background-color: #00ff00;
+      color: #002b11;
+    }
 
-.action-btn:hover {
-  background-color: #00ff00;
-  color: #002b11;
-}
+    .login-btn {
+      position: fixed;
+      top: 15px;
+      right: 15px;
+      background-color: #002b11;
+      color: #00ff00;
+      border: 1px solid #00ff00;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.2s;
+    }
 
-.login-btn {
-  position: fixed;
-  top: 15px;
-  right: 15px;
-  background-color: #002b11;
-  color: #00ff00;
-  border: 1px solid #00ff00;
-  padding: 8px 14px;
-  border-radius: 8px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: 0.2s;
-}
+    .login-btn:hover {
+      background-color: #00ff00;
+      color: #002b11;
+    }
 
-.login-btn:hover {
-  background-color: #00ff00;
-  color: #002b11;
-}
+    .status {
+      position: fixed;
+      top: 20px;
+      right: 130px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.9em;
+      color: lime;
+    }
 
-.status {
-  position: fixed;
-  top: 20px;
-  right: 130px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.9em;
-  color: lime;
-}
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: lime;
+    }
 
-.status-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background-color: lime;
-}
+    .offline .status-dot {
+      background-color: red;
+    }
 
-.offline .status-dot {
-  background-color: red;
-}
-
-.offline body {
-  background-color: #111;
-}
-
-
+    .offline body {
+      background-color: #111;
+    }
   </style>
 </head>
 <body>
-  <div class="status"><div class="status-dot"></div><span id="statusText">Connected</span></div>
+  <div class="status">
+    <div class="status-dot"></div>
+    <span id="statusText">Connected</span>
+  </div>
   <button class="login-btn">Admin Login</button>
 
   <h1>Boss Respawn Schedule</h1>
@@ -159,102 +155,132 @@ tr:last-child td {
   </table>
 
   <script>
-    const JSON_URL = "https://api.jsonbin.io/v3/b/6737a5aead19ca34f8b35a9c/latest"; // replace with your JSONBin endpoint
-    let bossData = [];
-    let isOnline = true;
-    let lastFetched = 0;
-    const REFRESH_INTERVAL = 10 * 60 * 1000; // 10 minutes
+    const JSON_URL = "https://api.jsonbin.io/v3/b/6737a5aead19ca34f8b35a9c/latest";
     const table = document.getElementById("bossTable");
     const statusDot = document.querySelector(".status-dot");
     const statusText = document.getElementById("statusText");
 
+    let bossData = [];
+    let isOnline = navigator.onLine;
+    let lastFetched = 0;
+    const REFRESH_INTERVAL = 10 * 60 * 1000; // 10 minutes
+
     // Display Philippine Time
     function updatePHTime() {
-      const options = { timeZone: "Asia/Manila", hour12: true, hour: "numeric", minute: "numeric", second: "numeric" };
-      document.getElementById("phTime").textContent = new Date().toLocaleTimeString("en-US", options);
+      const options = {
+        timeZone: "Asia/Manila",
+        hour12: true,
+        hour: "numeric",
+        minute: "numeric",
+        second: "numeric"
+      };
+      document.getElementById("phTime").textContent =
+        new Date().toLocaleTimeString("en-US", options);
     }
     setInterval(updatePHTime, 1000);
     updatePHTime();
+
+    // Render Table
+    function renderTable() {
+      table.innerHTML = "";
+      if (!bossData.length) {
+        table.innerHTML =
+          `<tr><td colspan="4" style="color:#999;">No data available</td></tr>`;
+        return;
+      }
+
+      bossData.forEach(boss => {
+        const row = document.createElement("tr");
+        const respawn = new Date(boss.respawn);
+        row.innerHTML = `
+          <td>${boss.name}</td>
+          <td class="countdown" data-time="${respawn}">--:--:--</td>
+          <td>${respawn.toLocaleString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true
+          })}</td>
+          <td><button class="action-btn">Reset</button></td>`;
+        table.appendChild(row);
+      });
+    }
 
     // Fetch boss data
     async function fetchBossData() {
       try {
         const now = Date.now();
-        if (now - lastFetched < REFRESH_INTERVAL) return;
+        if (now - lastFetched < REFRESH_INTERVAL && bossData.length) return;
+
         const res = await fetch(JSON_URL);
         const json = await res.json();
-        bossData = json.record.bosses;
+
+        // Handle both JSONBin formats
+        bossData = json.record?.bosses || json.bosses || [];
+        if (!bossData.length) throw new Error("Invalid JSON format");
+
         lastFetched = now;
         localStorage.setItem("bossDataCache", JSON.stringify(bossData));
         localStorage.setItem("lastFetched", lastFetched);
         renderTable();
-      } catch {
-        console.warn("⚠️ Offline - using cached data");
+      } catch (err) {
+        console.warn("⚠️ Offline or fetch failed — using cached data");
         const cached = localStorage.getItem("bossDataCache");
         if (cached) bossData = JSON.parse(cached);
         renderTable();
       }
     }
 
-    function renderTable() {
-      table.innerHTML = "";
-      bossData.forEach(boss => {
-        const row = document.createElement("tr");
-        const respawn = new Date(boss.respawn);
-        row.innerHTML = 
-          <td>${boss.name}</td>
-          <td class="countdown" data-time="${respawn}">--:--:--</td>
-          <td>${respawn.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true })}</td>
-          <td><button class="action-btn">Reset</button></td>;
-        table.appendChild(row);
-      });
-    }
-
+    // Update countdowns (frozen when offline)
     function updateCountdowns() {
-      if (!isOnline) return; // freeze timers when offline
+      if (!bossData.length) return;
       const now = new Date().getTime();
+
       document.querySelectorAll(".countdown").forEach(el => {
         const target = new Date(el.dataset.time).getTime();
         let diff = target - now;
         if (diff < 0) diff = 0;
+
         const h = String(Math.floor(diff / (1000 * 60 * 60))).padStart(2, "0");
         const m = String(Math.floor((diff / (1000 * 60)) % 60)).padStart(2, "0");
         const s = String(Math.floor((diff / 1000) % 60)).padStart(2, "0");
-        el.textContent = ${h}:${m}:${s};
+        el.textContent = `${h}:${m}:${s}`;
       });
     }
     setInterval(updateCountdowns, 1000);
 
     // Network handling
-    window.addEventListener("online", () => {
-      isOnline = true;
-      document.body.classList.remove("offline");
-      statusDot.style.backgroundColor = "lime";
-      statusText.textContent = "Connected";
-      fetchBossData();
-    });
+    function updateNetworkStatus() {
+      isOnline = navigator.onLine;
+      document.body.classList.toggle("offline", !isOnline);
+      statusDot.style.backgroundColor = isOnline ? "lime" : "red";
+      statusText.textContent = isOnline ? "Connected" : "Offline (Frozen)";
+      if (isOnline) fetchBossData();
+    }
 
-    window.addEventListener("offline", () => {
-      isOnline = false;
-      document.body.classList.add("offline");
-      statusDot.style.backgroundColor = "red";
-      statusText.textContent = "Offline (Frozen)";
-    });
+    window.addEventListener("online", updateNetworkStatus);
+    window.addEventListener("offline", updateNetworkStatus);
 
-    // Initial load
+    // Initial Load
+    const cached = localStorage.getItem("bossDataCache");
+    if (cached) {
+      bossData = JSON.parse(cached);
+      renderTable();
+    }
     fetchBossData();
     setInterval(fetchBossData, REFRESH_INTERVAL);
 
-    // Register Service Worker for PWA
+    // Register Service Worker
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
         navigator.serviceWorker
           .register("./service-worker.js")
           .then(() => console.log("✅ Service Worker Registered"))
-          .catch(err => console.log("❌ Service Worker Failed:", err));
+          .catch(err => console.error("❌ Service Worker Error:", err));
       });
     }
   </script>
-
 </body>
 </html>
