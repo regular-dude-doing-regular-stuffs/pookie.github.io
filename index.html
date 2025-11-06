@@ -133,11 +133,32 @@
       color: #66ff99;
       text-shadow: none;
     }
+
+    .floating-btn {
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #002b11;
+      color: #00ff00;
+      border: 1px solid #00ff00;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .floating-btn:hover {
+      background-color: #00ff00;
+      color: #002b11;
+    }
   </style>
 </head>
 <body>
   <div class="status"><div class="status-dot"></div><span id="statusText">Connected</span></div>
   <button class="login-btn">Admin Login</button>
+  <button class="floating-btn" onclick="addTimer()">+ Add Timer</button>
 
   <h1>Boss Respawn Schedule</h1>
   <div class="subtitle">Philippine Time (UTC+8)</div>
@@ -185,7 +206,7 @@
         if (now - lastFetched < REFRESH_INTERVAL && bossData.length > 0) return;
         const res = await fetch(JSON_URL);
         const json = await res.json();
-        bossData = json.record.bosses;
+        bossData = json.record.bosses || [];
         lastFetched = now;
         localStorage.setItem("bossDataCache", JSON.stringify(bossData));
         renderTable();
@@ -258,7 +279,6 @@
         let diff = target - now;
         const date = new Date(el.dataset.time);
         const shortDate = date.toLocaleString("en-US", { month: "short", day: "numeric" });
-
         if (diff < 0) diff = 0;
         const h = String(Math.floor(diff / (1000 * 60 * 60))).padStart(2, "0");
         const m = String(Math.floor((diff / (1000 * 60)) % 60)).padStart(2, "0");
@@ -290,7 +310,7 @@
       await saveBossData();
     }
 
-    // ⏩ Jump To a certain time (no loop reset)
+    // ⏩ Jump To
     async function jumpTo(index) {
       const addMins = parseInt(prompt("Jump forward how many minutes?"), 10);
       if (isNaN(addMins)) return;
@@ -301,13 +321,26 @@
       await saveBossData();
     }
 
-    // 🔁 Reset Timer (syncs too)
+    // 🔁 Reset Timer
     async function resetTimer(index) {
       const confirmReset = confirm(`Reset timer for ${bossData[index].name}?`);
       if (!confirmReset) return;
       const now = new Date();
-      now.setMinutes(now.getMinutes() + 30); // Example 30-minute respawn cycle
+      now.setMinutes(now.getMinutes() + 30);
       bossData[index].respawn = now.toISOString();
+      renderTable();
+      await saveBossData();
+    }
+
+    // ➕ Add Timer
+    async function addTimer() {
+      const name = prompt("Enter boss name:");
+      if (!name) return;
+      const mins = parseInt(prompt("Enter respawn duration (minutes):"), 10);
+      if (isNaN(mins)) return alert("Invalid duration.");
+      const now = new Date();
+      now.setMinutes(now.getMinutes() + mins);
+      bossData.push({ name, respawn: now.toISOString() });
       renderTable();
       await saveBossData();
     }
@@ -332,7 +365,7 @@
     fetchBossData();
     setInterval(fetchBossData, REFRESH_INTERVAL);
 
-    // ⚙️ PWA setup
+    // ⚙️ PWA
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
         navigator.serviceWorker
