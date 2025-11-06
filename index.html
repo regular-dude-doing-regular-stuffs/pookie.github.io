@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#003300" />
+  <link rel="manifest" href="manifest.json" />
   <title>Boss Respawn Schedule</title>
-  <meta name="theme-color" content="#002b11">
-  <link rel="manifest" href="manifest.json">
   <style>
     body {
       font-family: "Courier New", monospace;
@@ -24,43 +24,45 @@
     }
 
     #phTime {
-      color: red;
-      font-size: 3.5em;
+      color: #ff0000;
+      font-size: 4em;
       font-weight: bold;
-      text-shadow: 0 0 20px red;
+      text-shadow: 0 0 15px red;
       margin: 20px 0;
     }
 
     .subtitle {
-      color: #aaffaa;
       font-size: 0.9em;
+      color: #aaffaa;
+      margin-top: -10px;
     }
 
     table {
       margin: 20px auto;
-      width: 80%;
       border-collapse: collapse;
+      width: 70%;
       background-color: #001a0a;
-      border-radius: 12px;
+      border-radius: 10px;
       overflow: hidden;
       box-shadow: 0 0 15px #003300;
     }
 
     th, td {
-      padding: 12px;
-      border-bottom: 1px solid #00ff00;
+      padding: 14px;
+      border-bottom: 2px solid #00ff00;
     }
 
     th {
       color: lime;
       font-size: 1.1em;
+      font-weight: bold;
     }
 
     td {
-      color: #00ff66;
+      color: #00ff55;
       font-size: 1.2em;
       font-weight: bold;
-      text-shadow: 0 0 8px #00ff66;
+      text-shadow: 0 0 8px #00ff55;
     }
 
     tr:last-child td {
@@ -68,35 +70,18 @@
     }
 
     .action-btn {
-      background-color: #002b11;
+      background-color: #003300;
       border: 1px solid #00ff00;
       color: #00ff00;
       font-weight: bold;
+      padding: 6px 12px;
       border-radius: 6px;
-      padding: 5px 10px;
-      margin: 2px;
       cursor: pointer;
       transition: 0.2s;
+      margin: 2px;
     }
 
     .action-btn:hover {
-      background-color: #00ff00;
-      color: #002b11;
-    }
-
-    #addTimerBtn {
-      background-color: #003300;
-      border: 2px solid #00ff00;
-      color: #00ff00;
-      font-weight: bold;
-      border-radius: 10px;
-      padding: 10px 20px;
-      cursor: pointer;
-      transition: 0.3s;
-      margin-top: 10px;
-    }
-
-    #addTimerBtn:hover {
       background-color: #00ff00;
       color: #002b11;
     }
@@ -113,6 +98,11 @@
       font-weight: bold;
       cursor: pointer;
       transition: 0.2s;
+    }
+
+    .login-btn:hover {
+      background-color: #00ff00;
+      color: #002b11;
     }
 
     .status {
@@ -136,13 +126,21 @@
     .offline .status-dot {
       background-color: red;
     }
+
+    .offline body {
+      background-color: #111;
+    }
+
+    .small-date {
+      display: block;
+      font-size: 0.8em;
+      color: #66ff99;
+      text-shadow: none;
+    }
   </style>
 </head>
 <body>
-  <div class="status">
-    <div class="status-dot"></div>
-    <span id="statusText">Connected</span>
-  </div>
+  <div class="status"><div class="status-dot"></div><span id="statusText">Connected</span></div>
   <button class="login-btn">Admin Login</button>
 
   <h1>Boss Respawn Schedule</h1>
@@ -161,130 +159,135 @@
     <tbody id="bossTable"></tbody>
   </table>
 
-  <button id="addTimerBtn">+ Add Timer</button>
-
   <script>
     const JSON_URL = "https://api.jsonbin.io/v3/b/6737a5aead19ca34f8b35a9c/latest";
+    let bossData = [];
+    let isOnline = true;
+    let lastFetched = 0;
+    const REFRESH_INTERVAL = 10 * 60 * 1000; // 10 minutes
     const table = document.getElementById("bossTable");
     const statusDot = document.querySelector(".status-dot");
     const statusText = document.getElementById("statusText");
 
-    let bossData = [];
-    let isOnline = navigator.onLine;
-
-    // Philippine Time Display
+    // Display Philippine Time
     function updatePHTime() {
-      const options = { timeZone: "Asia/Manila", hour12: true, hour: "2-digit", minute: "2-digit", second: "2-digit" };
+      const options = { timeZone: "Asia/Manila", hour12: true, hour: "numeric", minute: "numeric", second: "numeric" };
       document.getElementById("phTime").textContent = new Date().toLocaleTimeString("en-US", options);
     }
     setInterval(updatePHTime, 1000);
+    updatePHTime();
 
-    // Default 3 Bosses
-    function defaultBossData() {
-      return [
-        { name: "Lordadine", respawn: Date.now() + 3600000 },
-        { name: "Vardanos", respawn: Date.now() + 5400000 },
-        { name: "Zaros", respawn: Date.now() + 7200000 }
-      ];
+    // Fetch boss data
+    async function fetchBossData() {
+      try {
+        const now = Date.now();
+        if (now - lastFetched < REFRESH_INTERVAL && bossData.length > 0) return;
+        const res = await fetch(JSON_URL);
+        const json = await res.json();
+        bossData = json.record.bosses;
+        lastFetched = now;
+        localStorage.setItem("bossDataCache", JSON.stringify(bossData));
+        localStorage.setItem("lastFetched", lastFetched);
+        renderTable();
+      } catch {
+        console.warn("⚠️ Offline - using cached data");
+        const cached = localStorage.getItem("bossDataCache");
+        if (cached) bossData = JSON.parse(cached);
+        renderTable();
+      }
     }
 
-    // Render Table
     function renderTable() {
       table.innerHTML = "";
+      if (!bossData || bossData.length === 0) {
+        table.innerHTML = `<tr><td colspan="4">No data available</td></tr>`;
+        return;
+      }
+
       bossData.forEach((boss, index) => {
         const respawn = new Date(boss.respawn);
+        const dateStr = respawn.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
+        const shortDate = respawn.toLocaleString("en-US", { month: "short", day: "numeric" });
+
         const row = document.createElement("tr");
         row.innerHTML = `
           <td>${boss.name}</td>
-          <td class="countdown" data-time="${respawn}">--:--:--</td>
-          <td>${respawn.toLocaleString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}</td>
+          <td class="countdown" data-time="${respawn}">
+            --:--:-- <span class="small-date">${shortDate}</span>
+          </td>
+          <td class="respawn-cell">${dateStr}</td>
           <td>
+            <button class="action-btn" onclick="adjustTime(${index})">Adjust Time</button>
             <button class="action-btn" onclick="resetTimer(${index})">Reset</button>
-            <button class="action-btn" onclick="editTimer(${index})">Edit</button>
-            <button class="action-btn" onclick="deleteTimer(${index})">Delete</button>
           </td>`;
         table.appendChild(row);
       });
     }
 
-    // Countdown Update
     function updateCountdowns() {
+      if (!isOnline) return; // freeze timers when offline
       const now = new Date().getTime();
       document.querySelectorAll(".countdown").forEach(el => {
         const target = new Date(el.dataset.time).getTime();
         let diff = target - now;
-        if (diff < 0) diff = 0;
+        const date = new Date(el.dataset.time);
+        const shortDate = date.toLocaleString("en-US", { month: "short", day: "numeric" });
 
+        if (diff < 0) diff = 0;
         const h = String(Math.floor(diff / (1000 * 60 * 60))).padStart(2, "0");
         const m = String(Math.floor((diff / (1000 * 60)) % 60)).padStart(2, "0");
         const s = String(Math.floor((diff / 1000) % 60)).padStart(2, "0");
-
-        el.textContent = `${h}:${m}:${s}`;
+        el.innerHTML = `${h}:${m}:${s} <span class="small-date">${shortDate}</span>`;
       });
     }
+    setInterval(updateCountdowns, 1000);
 
-    // Fetch or Cache
-    async function fetchBossData() {
-      try {
-        const res = await fetch(JSON_URL);
-        const json = await res.json();
-        bossData = json.record?.bosses || json.bosses || defaultBossData();
-        localStorage.setItem("bossDataCache", JSON.stringify(bossData));
-        renderTable();
-      } catch {
-        const cached = localStorage.getItem("bossDataCache");
-        bossData = cached ? JSON.parse(cached) : defaultBossData();
-        renderTable();
-      }
+    // Action functions
+    function adjustTime(index) {
+      const newTime = prompt("Enter new respawn time (HH:MM, 24-hour format):");
+      if (!newTime || !/^\d{1,2}:\d{2}$/.test(newTime)) return alert("Invalid format. Use HH:MM.");
+      const [h, m] = newTime.split(":").map(Number);
+      const now = new Date();
+      const newRespawn = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
+
+      bossData[index].respawn = newRespawn.toISOString();
+      localStorage.setItem("bossDataCache", JSON.stringify(bossData));
+      renderTable();
     }
 
-    // Timer Actions
     function resetTimer(index) {
-      bossData[index].respawn = Date.now() + 3600000;
-      localStorage.setItem("bossDataCache", JSON.stringify(bossData));
-      renderTable();
+      alert(`Timer reset for ${bossData[index].name} (placeholder action).`);
     }
 
-    function editTimer(index) {
-      const newName = prompt("Enter new boss name:", bossData[index].name);
-      if (newName) bossData[index].name = newName;
-      localStorage.setItem("bossDataCache", JSON.stringify(bossData));
-      renderTable();
-    }
-
-    function deleteTimer(index) {
-      if (confirm("Delete this timer?")) {
-        bossData.splice(index, 1);
-        localStorage.setItem("bossDataCache", JSON.stringify(bossData));
-        renderTable();
-      }
-    }
-
-    document.getElementById("addTimerBtn").addEventListener("click", () => {
-      const name = prompt("Enter boss name:");
-      if (!name) return;
-      bossData.push({ name, respawn: Date.now() + 3600000 });
-      localStorage.setItem("bossDataCache", JSON.stringify(bossData));
-      renderTable();
+    // Network handling
+    window.addEventListener("online", () => {
+      isOnline = true;
+      document.body.classList.remove("offline");
+      statusDot.style.backgroundColor = "lime";
+      statusText.textContent = "Connected";
+      fetchBossData();
     });
 
-    // Network Status
-    function updateNetworkStatus() {
-      isOnline = navigator.onLine;
-      document.body.classList.toggle("offline", !isOnline);
-      statusDot.style.backgroundColor = isOnline ? "lime" : "red";
-      statusText.textContent = isOnline ? "Connected" : "Offline";
-      if (isOnline) fetchBossData();
-    }
-    window.addEventListener("online", updateNetworkStatus);
-    window.addEventListener("offline", updateNetworkStatus);
+    window.addEventListener("offline", () => {
+      isOnline = false;
+      document.body.classList.add("offline");
+      statusDot.style.backgroundColor = "red";
+      statusText.textContent = "Offline (Frozen)";
+    });
 
-    // Initialize
-    const cached = localStorage.getItem("bossDataCache");
-    bossData = cached ? JSON.parse(cached) : defaultBossData();
-    renderTable();
+    // Initial load
     fetchBossData();
-    setInterval(updateCountdowns, 1000);
+    setInterval(fetchBossData, REFRESH_INTERVAL);
+
+    // Register Service Worker for PWA
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker
+          .register("./service-worker.js")
+          .then(() => console.log("✅ Service Worker Registered"))
+          .catch(err => console.log("❌ Service Worker Failed:", err));
+      });
+    }
   </script>
 </body>
 </html>
