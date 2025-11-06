@@ -134,11 +134,14 @@
       text-shadow: none;
     }
 
-    .floating-btn {
-      position: fixed;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
+    .top-controls {
+      margin-top: 15px;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .control-btn {
       background-color: #002b11;
       color: #00ff00;
       border: 1px solid #00ff00;
@@ -149,7 +152,7 @@
       transition: 0.2s;
     }
 
-    .floating-btn:hover {
+    .control-btn:hover {
       background-color: #00ff00;
       color: #002b11;
     }
@@ -225,11 +228,15 @@
 <body>
   <div class="status"><div class="status-dot"></div><span id="statusText">Connected</span></div>
   <button class="login-btn">Admin Login</button>
-  <button class="floating-btn" onclick="openModal()">+ Add Timer</button>
 
   <h1>Boss Respawn Schedule</h1>
   <div class="subtitle">Philippine Time (UTC+8)</div>
   <div id="phTime">--:--:--</div>
+
+  <div class="top-controls">
+    <button class="control-btn" onclick="openModal()">+ Add Timer</button>
+    <button class="control-btn" onclick="manualSave()">💾 Save Changes</button>
+  </div>
 
   <table>
     <thead>
@@ -271,14 +278,12 @@
     const statusDot = document.querySelector(".status-dot");
     const statusText = document.getElementById("statusText");
 
-    // PH Time
     function updatePHTime() {
       const options = { timeZone: "Asia/Manila", hour12: true, hour: "numeric", minute: "numeric", second: "numeric" };
       document.getElementById("phTime").textContent = new Date().toLocaleTimeString("en-US", options);
     }
     setInterval(updatePHTime, 1000);
 
-    // Fetch and save
     async function fetchBossData() {
       try {
         const res = await fetch(JSON_URL);
@@ -294,22 +299,16 @@
     }
 
     async function saveBossData() {
-      try {
-        await fetch(JSON_WRITE_URL, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json", "X-Master-Key": API_KEY },
-          body: JSON.stringify({ bosses: bossData }),
-        });
-      } catch (e) {
-        console.error("Sync failed:", e);
-      }
+      await fetch(JSON_WRITE_URL, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "X-Master-Key": API_KEY },
+        body: JSON.stringify({ bosses: bossData }),
+      });
     }
 
-    // Render
     function renderTable() {
       table.innerHTML = "";
       if (!bossData.length) return (table.innerHTML = `<tr><td colspan="4">No data</td></tr>`);
-
       bossData.forEach((boss, index) => {
         const respawn = new Date(boss.respawn);
         const dateStr = respawn.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
@@ -320,7 +319,7 @@
           <td class="countdown" data-time="${respawn}">
             --:--:-- <span class="small-date">${shortDate}</span>
           </td>
-          <td>${dateStr}</td>
+          <td contenteditable="true" onblur="updateRespawn(${index}, this.textContent.trim())">${dateStr}</td>
           <td>
             <button class="action-btn" onclick="adjustTime(${index})">Adjust</button>
             <button class="action-btn" onclick="jumpTo(${index})">Jump</button>
@@ -346,11 +345,15 @@
     }
     setInterval(updateCountdowns, 1000);
 
-    // Editable name
     async function updateName(index, newName) {
       if (!newName) return;
       bossData[index].name = newName;
-      await saveBossData();
+    }
+
+    async function updateRespawn(index, newValue) {
+      const parsedDate = new Date(newValue);
+      if (isNaN(parsedDate)) return alert("Invalid date format. Use valid format.");
+      bossData[index].respawn = parsedDate.toISOString();
     }
 
     async function adjustTime(index) {
@@ -361,7 +364,6 @@
       const newRespawn = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
       bossData[index].respawn = newRespawn.toISOString();
       renderTable();
-      await saveBossData();
     }
 
     async function jumpTo(index) {
@@ -371,7 +373,6 @@
       respawn.setMinutes(respawn.getMinutes() + addMins);
       bossData[index].respawn = respawn.toISOString();
       renderTable();
-      await saveBossData();
     }
 
     async function resetTimer(index) {
@@ -380,10 +381,8 @@
       now.setMinutes(now.getMinutes() + 30);
       bossData[index].respawn = now.toISOString();
       renderTable();
-      await saveBossData();
     }
 
-    // Modal functions
     function openModal() { document.getElementById("modal").style.display = "flex"; }
     function closeModal() { document.getElementById("modal").style.display = "none"; }
 
@@ -391,13 +390,16 @@
       const name = document.getElementById("bossName").value.trim();
       const mins = parseInt(document.getElementById("bossMinutes").value.trim(), 10);
       if (!name || isNaN(mins)) return alert("Please fill both fields correctly.");
-
       const now = new Date();
       now.setMinutes(now.getMinutes() + mins);
       bossData.push({ name, respawn: now.toISOString() });
       renderTable();
-      await saveBossData();
       closeModal();
+    }
+
+    async function manualSave() {
+      await saveBossData();
+      alert("✅ Changes saved to JSONBin!");
     }
 
     fetchBossData();
