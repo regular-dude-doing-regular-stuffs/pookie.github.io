@@ -164,7 +164,7 @@
     let bossData = [];
     let isOnline = true;
     let lastFetched = 0;
-    const REFRESH_INTERVAL = 10 * 60 * 1000; // 10 minutes
+    const REFRESH_INTERVAL = 4 * 60 * 1000; // 🔄 4 minutes
     const table = document.getElementById("bossTable");
     const statusDot = document.querySelector(".status-dot");
     const statusText = document.getElementById("statusText");
@@ -225,7 +225,7 @@
     }
 
     function updateCountdowns() {
-      if (!isOnline) return; // freeze timers when offline
+      if (!isOnline) return;
       const now = new Date().getTime();
       document.querySelectorAll(".countdown").forEach(el => {
         const target = new Date(el.dataset.time).getTime();
@@ -242,7 +242,6 @@
     }
     setInterval(updateCountdowns, 1000);
 
-    // Action functions
     function adjustTime(index) {
       const newTime = prompt("Enter new respawn time (HH:MM, 24-hour format):");
       if (!newTime || !/^\d{1,2}:\d{2}$/.test(newTime)) return alert("Invalid format. Use HH:MM.");
