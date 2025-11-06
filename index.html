@@ -153,12 +153,79 @@
       background-color: #00ff00;
       color: #002b11;
     }
+
+    /* Modal styling */
+    #modal {
+      display: none;
+      position: fixed;
+      z-index: 999;
+      left: 0; top: 0;
+      width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.75);
+      justify-content: center;
+      align-items: center;
+    }
+
+    #modalContent {
+      background: #001a0a;
+      padding: 20px 30px;
+      border: 2px solid #00ff00;
+      border-radius: 12px;
+      width: 300px;
+      text-align: left;
+      box-shadow: 0 0 20px #00ff00;
+    }
+
+    #modalContent h2 {
+      color: yellow;
+      margin-top: 0;
+    }
+
+    label {
+      display: block;
+      margin: 10px 0 5px;
+      color: #aaffaa;
+    }
+
+    input {
+      width: 100%;
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid #00ff00;
+      background: #002b11;
+      color: #00ff00;
+      font-weight: bold;
+    }
+
+    .modal-btn {
+      margin-top: 12px;
+      padding: 8px 14px;
+      border: 1px solid #00ff00;
+      background: #003300;
+      color: #00ff00;
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+      width: 48%;
+      transition: 0.2s;
+    }
+
+    .modal-btn:hover {
+      background: #00ff00;
+      color: #002b11;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
   <div class="status"><div class="status-dot"></div><span id="statusText">Connected</span></div>
   <button class="login-btn">Admin Login</button>
-  <button class="floating-btn" onclick="addTimer()">+ Add Timer</button>
+  <button class="floating-btn" onclick="openModal()">+ Add Timer</button>
 
   <h1>Boss Respawn Schedule</h1>
   <div class="subtitle">Philippine Time (UTC+8)</div>
@@ -176,109 +243,100 @@
     <tbody id="bossTable"></tbody>
   </table>
 
+  <!-- Modal for adding timer -->
+  <div id="modal">
+    <div id="modalContent">
+      <h2>Add New Timer</h2>
+      <label for="bossName">Boss Name:</label>
+      <input type="text" id="bossName" placeholder="Enter boss name" />
+      <label for="bossMinutes">Respawn Duration (minutes):</label>
+      <input type="number" id="bossMinutes" placeholder="Enter minutes" />
+      <div class="modal-actions">
+        <button class="modal-btn" onclick="saveModal()">Add</button>
+        <button class="modal-btn" onclick="closeModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <script>
-    // 🔗 JSONBin API details
     const BIN_ID = "6737a5aead19ca34f8b35a9c";
     const JSON_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}/latest`;
     const JSON_WRITE_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
-    const API_KEY = "$2a$10$WYyO8b2IWZgwFczllVFuXOKxWm7MVesk9dSXSb0g.0/CMFmB.e1vi"; // 🔒 Master key
+    const API_KEY = "$2a$10$WYyO8b2IWZgwFczllVFuXOKxWm7MVesk9dSXSb0g.0/CMFmB.e1vi";
 
     let bossData = [];
     let isOnline = true;
-    let lastFetched = 0;
-    const REFRESH_INTERVAL = 4 * 60 * 1000; // 4 minutes
+    const REFRESH_INTERVAL = 4 * 60 * 1000;
     const table = document.getElementById("bossTable");
     const statusDot = document.querySelector(".status-dot");
     const statusText = document.getElementById("statusText");
 
-    // ⏰ Display Philippine Time
+    // PH Time
     function updatePHTime() {
       const options = { timeZone: "Asia/Manila", hour12: true, hour: "numeric", minute: "numeric", second: "numeric" };
       document.getElementById("phTime").textContent = new Date().toLocaleTimeString("en-US", options);
     }
     setInterval(updatePHTime, 1000);
-    updatePHTime();
 
-    // 🔄 Fetch boss data
+    // Fetch and save
     async function fetchBossData() {
       try {
-        const now = Date.now();
-        if (now - lastFetched < REFRESH_INTERVAL && bossData.length > 0) return;
         const res = await fetch(JSON_URL);
         const json = await res.json();
         bossData = json.record.bosses || [];
-        lastFetched = now;
         localStorage.setItem("bossDataCache", JSON.stringify(bossData));
         renderTable();
       } catch {
-        console.warn("⚠️ Offline - using cached data");
         const cached = localStorage.getItem("bossDataCache");
         if (cached) bossData = JSON.parse(cached);
         renderTable();
       }
     }
 
-    // 💾 Save data to JSONBin
     async function saveBossData() {
-      if (!isOnline) {
-        console.warn("❌ Offline: Changes stored locally until reconnect");
-        localStorage.setItem("bossDataCache", JSON.stringify(bossData));
-        return;
-      }
       try {
         await fetch(JSON_WRITE_URL, {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Master-Key": API_KEY,
-          },
+          headers: { "Content-Type": "application/json", "X-Master-Key": API_KEY },
           body: JSON.stringify({ bosses: bossData }),
         });
-        console.log("✅ Synced to JSONBin");
-      } catch (err) {
-        console.error("❌ Sync failed:", err);
+      } catch (e) {
+        console.error("Sync failed:", e);
       }
     }
 
-    // 🧱 Render Table
+    // Render
     function renderTable() {
       table.innerHTML = "";
-      if (!bossData || bossData.length === 0) {
-        table.innerHTML = `<tr><td colspan="4">No data available</td></tr>`;
-        return;
-      }
+      if (!bossData.length) return (table.innerHTML = `<tr><td colspan="4">No data</td></tr>`);
 
       bossData.forEach((boss, index) => {
         const respawn = new Date(boss.respawn);
         const dateStr = respawn.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
         const shortDate = respawn.toLocaleString("en-US", { month: "short", day: "numeric" });
-
         const row = document.createElement("tr");
         row.innerHTML = `
-          <td>${boss.name}</td>
+          <td><span contenteditable="true" onblur="updateName(${index}, this.textContent.trim())">${boss.name}</span></td>
           <td class="countdown" data-time="${respawn}">
             --:--:-- <span class="small-date">${shortDate}</span>
           </td>
-          <td class="respawn-cell">${dateStr}</td>
+          <td>${dateStr}</td>
           <td>
-            <button class="action-btn" onclick="editName(${index})">Edit Name</button>
-            <button class="action-btn" onclick="adjustTime(${index})">Adjust Time</button>
-            <button class="action-btn" onclick="jumpTo(${index})">Jump To</button>
+            <button class="action-btn" onclick="adjustTime(${index})">Adjust</button>
+            <button class="action-btn" onclick="jumpTo(${index})">Jump</button>
             <button class="action-btn" onclick="resetTimer(${index})">Reset</button>
           </td>`;
         table.appendChild(row);
       });
     }
 
-    // ⏱ Countdown updates
     function updateCountdowns() {
-      if (!isOnline) return;
-      const now = new Date().getTime();
+      const now = Date.now();
       document.querySelectorAll(".countdown").forEach(el => {
         const target = new Date(el.dataset.time).getTime();
-        let diff = target - now;
         const date = new Date(el.dataset.time);
         const shortDate = date.toLocaleString("en-US", { month: "short", day: "numeric" });
+        let diff = target - now;
         if (diff < 0) diff = 0;
         const h = String(Math.floor(diff / (1000 * 60 * 60))).padStart(2, "0");
         const m = String(Math.floor((diff / (1000 * 60)) % 60)).padStart(2, "0");
@@ -288,43 +346,36 @@
     }
     setInterval(updateCountdowns, 1000);
 
-    // ✏️ Edit Name
-    async function editName(index) {
-      const newName = prompt("Enter new boss name:", bossData[index].name);
+    // Editable name
+    async function updateName(index, newName) {
       if (!newName) return;
-      bossData[index].name = newName.trim();
-      renderTable();
+      bossData[index].name = newName;
       await saveBossData();
     }
 
-    // 🕒 Adjust Time
     async function adjustTime(index) {
-      const newTime = prompt("Enter new respawn time (HH:MM, 24-hour):");
-      if (!newTime || !/^\d{1,2}:\d{2}$/.test(newTime)) return alert("Invalid format. Use HH:MM.");
+      const newTime = prompt("Enter new respawn time (HH:MM 24-hour):");
+      if (!newTime || !/^\d{1,2}:\d{2}$/.test(newTime)) return;
       const [h, m] = newTime.split(":").map(Number);
       const now = new Date();
-      const newRespawn = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
-
+      const newRespawn = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
       bossData[index].respawn = newRespawn.toISOString();
       renderTable();
       await saveBossData();
     }
 
-    // ⏩ Jump To
     async function jumpTo(index) {
-      const addMins = parseInt(prompt("Jump forward how many minutes?"), 10);
+      const addMins = parseInt(prompt("Jump forward by how many minutes?"), 10);
       if (isNaN(addMins)) return;
-      const currentRespawn = new Date(bossData[index].respawn);
-      currentRespawn.setMinutes(currentRespawn.getMinutes() + addMins);
-      bossData[index].respawn = currentRespawn.toISOString();
+      const respawn = new Date(bossData[index].respawn);
+      respawn.setMinutes(respawn.getMinutes() + addMins);
+      bossData[index].respawn = respawn.toISOString();
       renderTable();
       await saveBossData();
     }
 
-    // 🔁 Reset Timer
     async function resetTimer(index) {
-      const confirmReset = confirm(`Reset timer for ${bossData[index].name}?`);
-      if (!confirmReset) return;
+      if (!confirm(`Reset ${bossData[index].name}?`)) return;
       const now = new Date();
       now.setMinutes(now.getMinutes() + 30);
       bossData[index].respawn = now.toISOString();
@@ -332,48 +383,25 @@
       await saveBossData();
     }
 
-    // ➕ Add Timer
-    async function addTimer() {
-      const name = prompt("Enter boss name:");
-      if (!name) return;
-      const mins = parseInt(prompt("Enter respawn duration (minutes):"), 10);
-      if (isNaN(mins)) return alert("Invalid duration.");
+    // Modal functions
+    function openModal() { document.getElementById("modal").style.display = "flex"; }
+    function closeModal() { document.getElementById("modal").style.display = "none"; }
+
+    async function saveModal() {
+      const name = document.getElementById("bossName").value.trim();
+      const mins = parseInt(document.getElementById("bossMinutes").value.trim(), 10);
+      if (!name || isNaN(mins)) return alert("Please fill both fields correctly.");
+
       const now = new Date();
       now.setMinutes(now.getMinutes() + mins);
       bossData.push({ name, respawn: now.toISOString() });
       renderTable();
       await saveBossData();
+      closeModal();
     }
 
-    // 🌐 Network handling
-    window.addEventListener("online", () => {
-      isOnline = true;
-      document.body.classList.remove("offline");
-      statusDot.style.backgroundColor = "lime";
-      statusText.textContent = "Connected";
-      fetchBossData();
-    });
-
-    window.addEventListener("offline", () => {
-      isOnline = false;
-      document.body.classList.add("offline");
-      statusDot.style.backgroundColor = "red";
-      statusText.textContent = "Offline (Frozen)";
-    });
-
-    // 🧭 Initialize
     fetchBossData();
     setInterval(fetchBossData, REFRESH_INTERVAL);
-
-    // ⚙️ PWA
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker
-          .register("./service-worker.js")
-          .then(() => console.log("✅ Service Worker Registered"))
-          .catch(err => console.log("❌ Service Worker Failed:", err));
-      });
-    }
   </script>
 </body>
 </html>
